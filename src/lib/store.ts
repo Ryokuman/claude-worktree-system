@@ -17,95 +17,62 @@ function readJson<T>(filename: string): T[] {
     fs.writeFileSync(filePath, "[]", "utf-8");
     return [];
   }
-  const raw = fs.readFileSync(filePath, "utf-8");
-  return JSON.parse(raw);
+  return JSON.parse(fs.readFileSync(filePath, "utf-8"));
 }
 
 function writeJson<T>(filename: string, data: T[]): void {
   ensureDataDir();
-  const filePath = path.join(DATA_DIR, filename);
-  fs.writeFileSync(filePath, JSON.stringify(data, null, 2), "utf-8");
+  fs.writeFileSync(
+    path.join(DATA_DIR, filename),
+    JSON.stringify(data, null, 2),
+    "utf-8"
+  );
 }
 
-class Store {
-  private active: ActiveWorktree[] = [];
-  private deactive: DeactiveBranch[] = [];
-  private ended: EndedWorktree[] = [];
-  private loaded = false;
+// --- Active ---
 
-  load() {
-    if (this.loaded) return;
-    this.active = readJson<ActiveWorktree>("active.json");
-    this.deactive = readJson<DeactiveBranch>("deactive.json");
-    this.ended = readJson<EndedWorktree>("ended.json");
-    this.loaded = true;
-  }
+export const getActive = () => readJson<ActiveWorktree>("active.json");
 
-  getActive(): ActiveWorktree[] {
-    this.load();
-    return this.active;
-  }
+export const setActive = (data: ActiveWorktree[]) =>
+  writeJson("active.json", data);
 
-  getDeactive(): DeactiveBranch[] {
-    this.load();
-    return this.deactive;
-  }
-
-  getEnded(): EndedWorktree[] {
-    this.load();
-    return this.ended;
-  }
-
-  setActive(data: ActiveWorktree[]) {
-    this.active = data;
-    writeJson("active.json", data);
-  }
-
-  setDeactive(data: DeactiveBranch[]) {
-    this.deactive = data;
-    writeJson("deactive.json", data);
-  }
-
-  setEnded(data: EndedWorktree[]) {
-    this.ended = data;
-    writeJson("ended.json", data);
-  }
-
-  addActive(worktree: ActiveWorktree) {
-    this.load();
-    this.active.push(worktree);
-    writeJson("active.json", this.active);
-  }
-
-  removeActive(taskNo: string): ActiveWorktree | undefined {
-    this.load();
-    const idx = this.active.findIndex((w) => w.taskNo === taskNo);
-    if (idx === -1) return undefined;
-    const [removed] = this.active.splice(idx, 1);
-    writeJson("active.json", this.active);
-    return removed;
-  }
-
-  updateActive(taskNo: string, updates: Partial<ActiveWorktree>) {
-    this.load();
-    const worktree = this.active.find((w) => w.taskNo === taskNo);
-    if (worktree) {
-      Object.assign(worktree, updates);
-      writeJson("active.json", this.active);
-    }
-    return worktree;
-  }
-
-  addEnded(item: EndedWorktree) {
-    this.load();
-    this.ended.push(item);
-    writeJson("ended.json", this.ended);
-  }
-
-  reload() {
-    this.loaded = false;
-    this.load();
-  }
+export function addActive(worktree: ActiveWorktree) {
+  const list = getActive();
+  list.push(worktree);
+  setActive(list);
 }
 
-export const store = new Store();
+export function removeActive(taskNo: string): ActiveWorktree | undefined {
+  const list = getActive();
+  const idx = list.findIndex((w) => w.taskNo === taskNo);
+  if (idx === -1) return undefined;
+  const [removed] = list.splice(idx, 1);
+  setActive(list);
+  return removed;
+}
+
+export function updateActive(taskNo: string, updates: Partial<ActiveWorktree>) {
+  const list = getActive();
+  const worktree = list.find((w) => w.taskNo === taskNo);
+  if (!worktree) return undefined;
+  Object.assign(worktree, updates);
+  setActive(list);
+  return worktree;
+}
+
+// --- Deactive ---
+
+export const getDeactive = () => readJson<DeactiveBranch>("deactive.json");
+
+export const setDeactive = (data: DeactiveBranch[]) =>
+  writeJson("deactive.json", data);
+
+// --- Ended ---
+
+export const getEnded = () => readJson<EndedWorktree>("ended.json");
+
+export function addEnded(item: EndedWorktree) {
+  const list = getEnded();
+  list.push(item);
+  writeJson("ended.json", list);
+}
