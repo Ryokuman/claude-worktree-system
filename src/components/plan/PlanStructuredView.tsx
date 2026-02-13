@@ -46,7 +46,7 @@ export function PlanStructuredView({
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
 
-  const doneCount = plan.steps.filter((s) => s.status === "done").length;
+  const doneCount = plan.steps.filter((s) => s.status.replace(/-/g, "_") === "done").length;
   const total = plan.steps.length;
   const encodedBranch = encodeURIComponent(branch);
 
@@ -115,7 +115,8 @@ export function PlanStructuredView({
       {/* Steps */}
       <div className="flex flex-col gap-2">
         {plan.steps.map((step) => {
-          const cfg = STATUS_CONFIG[step.status];
+          const normalizedStatus = step.status.replace(/-/g, "_") as PlanStepStatus;
+          const cfg = STATUS_CONFIG[normalizedStatus] ?? STATUS_CONFIG.pending;
           const isExpanded = expandedId === step.id;
           const isEditing = editingId === step.id;
           const file = getFileForStep(step.file);
@@ -128,7 +129,7 @@ export function PlanStructuredView({
               <div className="flex items-center justify-between px-4 py-3">
                 <div className="flex items-center gap-3">
                   <button
-                    onClick={() => handleStatusChange(step.id, step.status)}
+                    onClick={() => handleStatusChange(step.id, normalizedStatus)}
                     className={`rounded px-2 py-0.5 text-xs font-medium ${cfg.bg} ${cfg.text} hover:opacity-80 transition-opacity`}
                     title="클릭하여 상태 변경"
                   >
