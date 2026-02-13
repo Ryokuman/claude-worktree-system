@@ -7,6 +7,7 @@ export interface ActiveWorktree {
   status: "running" | "stopped";
   pid: number | null;
   createdAt: string;
+  hasPlan?: boolean;
 }
 
 export interface DeactiveBranch {

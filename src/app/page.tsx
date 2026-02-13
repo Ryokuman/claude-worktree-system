@@ -38,20 +38,23 @@ export default function DashboardPage() {
 
   const handleTerminalClose = useCallback(async () => {
     if (terminalBranch) {
-      // After terminal closes, create the worktree
-      try {
-        await fetch("/api/worktrees", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ branch: terminalBranch }),
-        });
-      } catch (err) {
-        console.error("Failed to create worktree:", err);
+      // Only create worktree if not already active
+      const isAlreadyActive = active.some((w) => w.branch === terminalBranch);
+      if (!isAlreadyActive) {
+        try {
+          await fetch("/api/worktrees", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ branch: terminalBranch }),
+          });
+        } catch (err) {
+          console.error("Failed to create worktree:", err);
+        }
       }
     }
     setTerminalBranch(null);
     refresh();
-  }, [terminalBranch, refresh]);
+  }, [terminalBranch, active, refresh]);
 
   if (loading) {
     return (
@@ -76,7 +79,7 @@ export default function DashboardPage() {
         </button>
       </header>
 
-      <WorktreeList worktrees={active} onRefresh={refresh} />
+      <WorktreeList worktrees={active} onRefresh={refresh} onOpenTerminal={handleOpenTerminal} />
 
       <div className="flex items-center justify-between mt-6">
         <button

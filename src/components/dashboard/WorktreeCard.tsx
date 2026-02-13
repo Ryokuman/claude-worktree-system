@@ -8,9 +8,10 @@ import { StatusBadge } from "./StatusBadge";
 interface WorktreeCardProps {
   worktree: ActiveWorktree;
   onRefresh: () => void;
+  onOpenTerminal: (branch: string) => void;
 }
 
-export function WorktreeCard({ worktree, onRefresh }: WorktreeCardProps) {
+export function WorktreeCard({ worktree, onRefresh, onOpenTerminal }: WorktreeCardProps) {
   const [loading, setLoading] = useState(false);
 
   async function handleStart() {
@@ -47,7 +48,6 @@ export function WorktreeCard({ worktree, onRefresh }: WorktreeCardProps) {
   return (
     <div className="flex items-center justify-between rounded-lg border border-gray-800 bg-gray-900 px-4 py-3 hover:border-gray-700 transition-colors">
       <div className="flex items-center gap-4 min-w-0">
-        {/* TaskNo + TaskName → redirect to worktree port */}
         {worktree.status === "running" ? (
           <a
             href={`http://localhost:${worktree.port}`}
@@ -66,17 +66,25 @@ export function WorktreeCard({ worktree, onRefresh }: WorktreeCardProps) {
       </div>
 
       <div className="flex items-center gap-3 shrink-0">
-        {/* Plan link */}
-        <Link
-          href={`/plan/${encodeURIComponent(worktree.branch)}`}
-          className="text-xs text-gray-500 hover:text-gray-300 transition-colors"
-        >
-          plan
-        </Link>
+        {/* Plan: show link or create button */}
+        {worktree.hasPlan ? (
+          <Link
+            href={`/plan/${encodeURIComponent(worktree.branch)}`}
+            className="text-xs text-gray-500 hover:text-gray-300 transition-colors"
+          >
+            plan
+          </Link>
+        ) : (
+          <button
+            onClick={() => onOpenTerminal(worktree.branch)}
+            className="rounded px-2 py-1 text-xs font-medium bg-purple-900/50 text-purple-400 hover:bg-purple-900 transition-colors"
+          >
+            + plan
+          </button>
+        )}
 
         <StatusBadge status={worktree.status} />
 
-        {/* Controls */}
         <div className="flex items-center gap-1">
           {worktree.status === "stopped" ? (
             <button

@@ -84,12 +84,3 @@ export function removeWorktree(targetPath: string): void {
     encoding: "utf-8",
   });
 }
-
-export function fetchAll(): void {
-  const cwd = env.MAIN_REPO_PATH;
-  execSync("git fetch --all --prune", {
-    cwd,
-    encoding: "utf-8",
-    timeout: 30000,
-  });
-}
