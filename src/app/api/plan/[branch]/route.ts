@@ -1,7 +1,15 @@
 import { NextResponse } from "next/server";
 import { listPlanFiles, writePlanFile } from "@/lib/plan-manager";
 
-// GET /api/plan/[branch] - List plan files (A11)
+/**
+ * GET /api/plan/:branch
+ *
+ * 해당 브랜치의 플랜 파일 목록과 내용을 반환한다. (A11)
+ *
+ * Params: branch - 브랜치명 (URL encoded)
+ *
+ * Response 200: PlanFile[] { name, path, content, updatedAt }
+ */
 export async function GET(
   _request: Request,
   { params }: { params: Promise<{ branch: string }> }
@@ -12,7 +20,18 @@ export async function GET(
   return NextResponse.json(files);
 }
 
-// PUT /api/plan/[branch] - Update plan file (A12)
+/**
+ * PUT /api/plan/:branch
+ *
+ * 플랜 파일 내용을 수정한다. (A12)
+ *
+ * Params: branch - 브랜치명 (URL encoded)
+ * Body: { filename: string, content: string }
+ *
+ * Response 200: { status: "updated", filename: string }
+ * Response 400: { error: "filename and content are required" }
+ * Response 500: { error: string }
+ */
 export async function PUT(
   request: Request,
   { params }: { params: Promise<{ branch: string }> }

@@ -1,7 +1,18 @@
 import { NextResponse } from "next/server";
 import { terminalManager } from "@/lib/terminal-manager";
 
-// POST /api/terminal - Create a new terminal session
+/**
+ * POST /api/terminal
+ *
+ * 새 터미널(PTY) 세션을 생성한다. (A5)
+ * 생성된 sessionId로 ws://host/ws/terminal/{sessionId} 에 WebSocket 연결하여 사용.
+ *
+ * Body: { cwd: string } - 터미널 시작 디렉토리
+ *
+ * Response 201: TerminalSession { id, pid, cwd, createdAt }
+ * Response 400: { error: "cwd is required" }
+ * Response 500: { error: string }
+ */
 export async function POST(request: Request) {
   try {
     const { cwd } = await request.json();
@@ -17,7 +28,13 @@ export async function POST(request: Request) {
   }
 }
 
-// GET /api/terminal - List terminal sessions
+/**
+ * GET /api/terminal
+ *
+ * 현재 활성 터미널 세션 목록을 반환한다.
+ *
+ * Response 200: TerminalSession[]
+ */
 export async function GET() {
   return NextResponse.json(terminalManager.listSessions());
 }
