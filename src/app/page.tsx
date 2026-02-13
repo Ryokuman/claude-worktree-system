@@ -121,7 +121,9 @@ export default function DashboardPage() {
 
       {terminalBranch && (
         <TerminalModal
-          branch={terminalBranch}
+          title={terminalBranch}
+          cwd={process.env.NEXT_PUBLIC_MAIN_REPO_PATH || "/tmp"}
+          closeLabel="Close & Create Worktree"
           onClose={handleTerminalClose}
         />
       )}

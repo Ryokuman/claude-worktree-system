@@ -18,20 +18,29 @@ interface PtySession {
 class TerminalManager {
   private sessions = new Map<string, PtySession>();
 
-  createSession(cwd: string): TerminalSession {
+  createSession(cwd: string, initialCommand?: string): TerminalSession {
     const id = randomUUID();
     const shell = process.env.SHELL || "/bin/zsh";
 
-    const ptyProcess = pty.spawn(shell, [], {
-      name: "xterm-256color",
-      cols: 120,
-      rows: 30,
-      cwd,
-      env: {
-        ...process.env,
-        TERM: "xterm-256color",
-      } as Record<string, string>,
-    });
+    let ptyProcess: pty.IPty;
+    try {
+      ptyProcess = pty.spawn(shell, [], {
+        name: "xterm-256color",
+        cols: 120,
+        rows: 30,
+        cwd,
+        env: {
+          ...process.env,
+          TERM: "xterm-256color",
+        } as Record<string, string>,
+      });
+    } catch (e) {
+      throw new Error(`Failed to spawn shell: ${e}`);
+    }
+
+    if (initialCommand) {
+      ptyProcess.write(initialCommand + "\n");
+    }
 
     const session: PtySession = {
       id,

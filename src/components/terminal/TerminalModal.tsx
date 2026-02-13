@@ -1,14 +1,29 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { XTerminal } from "./XTerminal";
+import { useState, useEffect, useRef } from "react";
+import { useTerminal } from "./useTerminal";
 
 interface TerminalModalProps {
-  branch: string;
+  title: string;
+  cwd: string;
+  initialCommand?: string;
+  closeLabel?: string;
   onClose: () => void;
 }
 
-export function TerminalModal({ branch, onClose }: TerminalModalProps) {
+function TerminalMount({ sessionId }: { sessionId: string }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  useTerminal(containerRef, { sessionId });
+  return <div ref={containerRef} className="h-full w-full" />;
+}
+
+export function TerminalModal({
+  title,
+  cwd,
+  initialCommand,
+  closeLabel = "Close",
+  onClose,
+}: TerminalModalProps) {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -18,7 +33,7 @@ export function TerminalModal({ branch, onClose }: TerminalModalProps) {
         const res = await fetch("/api/terminal", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ cwd: process.env.NEXT_PUBLIC_MAIN_REPO_PATH || "/tmp" }),
+          body: JSON.stringify({ cwd, initialCommand }),
         });
         if (!res.ok) throw new Error("Failed to create terminal session");
         const data = await res.json();
@@ -28,26 +43,26 @@ export function TerminalModal({ branch, onClose }: TerminalModalProps) {
       }
     }
     createSession();
-  }, [branch]);
+  }, [cwd, initialCommand]);
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-black/90">
       <div className="flex items-center justify-between px-4 py-2 bg-gray-900 border-b border-gray-800">
         <span className="text-sm text-gray-300 font-mono">
-          Terminal - {branch}
+          Terminal - {title}
         </span>
         <button
           onClick={onClose}
           className="rounded px-3 py-1 text-xs font-medium bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-gray-200 transition-colors"
         >
-          Close & Create Worktree
+          {closeLabel}
         </button>
       </div>
       <div className="flex-1 p-1">
         {error && (
           <div className="p-4 text-red-400 text-sm">Error: {error}</div>
         )}
-        {sessionId && <XTerminal sessionId={sessionId} />}
+        {sessionId && <TerminalMount sessionId={sessionId} />}
       </div>
     </div>
   );

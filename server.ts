@@ -80,6 +80,7 @@ app.prepare().then(async () => {
 
       ws.on("close", () => {
         dataHandler.dispose();
+        terminalManager.destroySession(sessionId);
       });
     });
   });

@@ -7,7 +7,7 @@ import { terminalManager } from "@/lib/terminal-manager";
  * 새 터미널(PTY) 세션을 생성한다. (A5)
  * 생성된 sessionId로 ws://host/ws/terminal/{sessionId} 에 WebSocket 연결하여 사용.
  *
- * Body: { cwd: string } - 터미널 시작 디렉토리
+ * Body: { cwd: string, initialCommand?: string } - 터미널 시작 디렉토리 및 초기 명령어
  *
  * Response 201: TerminalSession { id, pid, cwd, createdAt }
  * Response 400: { error: "cwd is required" }
@@ -15,12 +15,12 @@ import { terminalManager } from "@/lib/terminal-manager";
  */
 export async function POST(request: Request) {
   try {
-    const { cwd } = await request.json();
+    const { cwd, initialCommand } = await request.json();
     if (!cwd) {
       return NextResponse.json({ error: "cwd is required" }, { status: 400 });
     }
 
-    const session = terminalManager.createSession(cwd);
+    const session = terminalManager.createSession(cwd, initialCommand);
     return NextResponse.json(session, { status: 201 });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Unknown error";
