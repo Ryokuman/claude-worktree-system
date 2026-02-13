@@ -1,0 +1,23 @@
+# dependencies
+node_modules/
+
+# next.js
+.next/
+out/
+
+# env (user-specific)
+.env
+.env.local
+
+# data (runtime)
+work-trees/
+plan/
+
+# logs
+*.log
+npm-debug.log*
+
+# misc
+.DS_Store
+*.tsbuildinfo
+next-env.d.ts
