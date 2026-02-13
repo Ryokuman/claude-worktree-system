@@ -2,8 +2,6 @@
 
 import { useState, useEffect, use } from "react";
 import Link from "next/link";
-import { PlanFileList } from "@/components/plan/PlanFileList";
-import { PlanFileViewer } from "@/components/plan/PlanFileViewer";
 import { PlanFileEditor } from "@/components/plan/PlanFileEditor";
 import type { PlanFile } from "@/lib/types";
 
@@ -74,20 +72,52 @@ export default function PlanPage({
         </div>
       ) : (
         <div className="grid grid-cols-[240px_1fr] gap-4 h-[calc(100vh-200px)]">
-          <PlanFileList
-            files={files}
-            selected={selectedFile}
-            onSelect={(name) => {
-              setSelectedFile(name);
-              setEditing(false);
-            }}
-          />
+          {/* File list */}
+          <div className="overflow-auto rounded-lg border border-gray-800 bg-gray-900">
+            <div className="p-3 border-b border-gray-800">
+              <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                Files
+              </h3>
+            </div>
+            <div className="flex flex-col">
+              {files.map((file) => (
+                <button
+                  key={file.name}
+                  onClick={() => {
+                    setSelectedFile(file.name);
+                    setEditing(false);
+                  }}
+                  className={`text-left px-3 py-2 text-sm transition-colors ${
+                    selectedFile === file.name
+                      ? "bg-gray-800 text-gray-100"
+                      : "text-gray-400 hover:bg-gray-800/50 hover:text-gray-200"
+                  }`}
+                >
+                  {file.name}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* File content */}
           <div className="overflow-auto rounded-lg border border-gray-800 bg-gray-900">
             {currentFile && !editing && (
-              <PlanFileViewer
-                file={currentFile}
-                onEdit={() => setEditing(true)}
-              />
+              <div className="flex flex-col h-full">
+                <div className="flex items-center justify-between px-4 py-2 border-b border-gray-800">
+                  <span className="text-sm font-medium text-gray-300">
+                    {currentFile.name}
+                  </span>
+                  <button
+                    onClick={() => setEditing(true)}
+                    className="rounded px-3 py-1 text-xs font-medium bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-gray-200 transition-colors"
+                  >
+                    Edit
+                  </button>
+                </div>
+                <pre className="flex-1 overflow-auto p-4 text-sm text-gray-300 font-mono whitespace-pre-wrap">
+                  {currentFile.content}
+                </pre>
+              </div>
             )}
             {currentFile && editing && (
               <PlanFileEditor

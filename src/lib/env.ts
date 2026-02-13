@@ -11,5 +11,5 @@ export const env = {
     process.env.HEALTHCHECK_INTERVAL || "10000",
     10
   ),
-  HEALTHCHECK_PATH: process.env.HEALTHCHECK_PATH || "/api/healthz",
+  HEALTHCHECK_PATH: process.env.HEALTHCHECK_PATH || "/",
 } as const;

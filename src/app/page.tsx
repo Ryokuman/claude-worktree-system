@@ -1,60 +1,46 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { useWorktrees } from "@/hooks/useWorktrees";
-import { WorktreeList } from "@/components/dashboard/WorktreeList";
+import { WorktreeCard } from "@/components/dashboard/WorktreeCard";
 import { AddWorktreeDialog } from "@/components/dashboard/AddWorktreeDialog";
-import dynamic from "next/dynamic";
-
-const TerminalModal = dynamic(
-  () =>
-    import("@/components/terminal/TerminalModal").then(
-      (mod) => mod.TerminalModal
-    ),
-  { ssr: false }
-);
+import type { ActiveWorktree, DeactiveBranch } from "@/lib/types";
 
 export default function DashboardPage() {
-  const { active, deactive, loading, refresh } = useWorktrees();
+  const [active, setActive] = useState<ActiveWorktree[]>([]);
+  const [deactive, setDeactive] = useState<DeactiveBranch[]>([]);
+  const [loading, setLoading] = useState(true);
   const [showAddDialog, setShowAddDialog] = useState(false);
-  const [terminalBranch, setTerminalBranch] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+
+  const fetchStatus = useCallback(async () => {
+    try {
+      const res = await fetch("/api/status");
+      if (!res.ok) throw new Error("Failed to fetch status");
+      const data = await res.json();
+      setActive(data.active);
+      setDeactive(data.deactive);
+      setLoading(false);
+    } catch {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchStatus();
+    const interval = setInterval(fetchStatus, 5000);
+    return () => clearInterval(interval);
+  }, [fetchStatus]);
 
   const handleRefreshGit = useCallback(async () => {
     setRefreshing(true);
     try {
       await fetch("/api/refresh", { method: "POST" });
-      await refresh();
+      await fetchStatus();
     } finally {
       setRefreshing(false);
     }
-  }, [refresh]);
-
-  const handleOpenTerminal = useCallback((branch: string) => {
-    setTerminalBranch(branch);
-    setShowAddDialog(false);
-  }, []);
-
-  const handleTerminalClose = useCallback(async () => {
-    if (terminalBranch) {
-      // Only create worktree if not already active
-      const isAlreadyActive = active.some((w) => w.branch === terminalBranch);
-      if (!isAlreadyActive) {
-        try {
-          await fetch("/api/worktrees", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ branch: terminalBranch }),
-          });
-        } catch (err) {
-          console.error("Failed to create worktree:", err);
-        }
-      }
-    }
-    setTerminalBranch(null);
-    refresh();
-  }, [terminalBranch, active, refresh]);
+  }, [fetchStatus]);
 
   if (loading) {
     return (
@@ -67,9 +53,7 @@ export default function DashboardPage() {
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
       <header className="flex items-center justify-between mb-8">
-        <h1 className="text-2xl font-bold text-gray-100">
-          {process.env.NEXT_PUBLIC_PROJECT_NAME} Worktree Handler
-        </h1>
+        <h1 className="text-2xl font-bold text-gray-100">Worktree Handler</h1>
         <button
           onClick={handleRefreshGit}
           disabled={refreshing}
@@ -79,7 +63,21 @@ export default function DashboardPage() {
         </button>
       </header>
 
-      <WorktreeList worktrees={active} onRefresh={refresh} onOpenTerminal={handleOpenTerminal} />
+      {active.length === 0 ? (
+        <div className="rounded-lg border border-gray-800 bg-gray-900/50 p-8 text-center text-gray-500">
+          No active worktrees. Click [+ Add] to create one.
+        </div>
+      ) : (
+        <div className="flex flex-col gap-2">
+          {active.map((wt) => (
+            <WorktreeCard
+              key={wt.taskNo}
+              worktree={wt}
+              onRefresh={fetchStatus}
+            />
+          ))}
+        </div>
+      )}
 
       <div className="flex items-center justify-between mt-6">
         <button
@@ -112,19 +110,9 @@ export default function DashboardPage() {
           branches={deactive}
           onAdd={() => {
             setShowAddDialog(false);
-            refresh();
+            fetchStatus();
           }}
           onClose={() => setShowAddDialog(false)}
-          onOpenTerminal={handleOpenTerminal}
-        />
-      )}
-
-      {terminalBranch && (
-        <TerminalModal
-          title={terminalBranch}
-          cwd={process.env.NEXT_PUBLIC_MAIN_REPO_PATH || "/tmp"}
-          closeLabel="Close & Create Worktree"
-          onClose={handleTerminalClose}
         />
       )}
     </div>

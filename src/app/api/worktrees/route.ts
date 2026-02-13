@@ -39,21 +39,30 @@ export async function GET() {
  */
 export async function POST(request: Request) {
   try {
-    const { branch } = await request.json();
+    const { branch, healthCheckPath } = await request.json();
     if (!branch) {
-      return NextResponse.json({ error: "branch is required" }, { status: 400 });
+      return NextResponse.json(
+        { error: "branch is required" },
+        { status: 400 },
+      );
     }
 
     const active = readJson<ActiveWorktree>("active.json");
     if (active.find((w) => w.branch === branch)) {
-      return NextResponse.json({ error: "Branch already active" }, { status: 409 });
+      return NextResponse.json(
+        { error: "Branch already active" },
+        { status: 409 },
+      );
     }
 
     const taskNo = extractTaskNo(branch);
     const taskName = branchToTaskName(branch);
     const port = await findAvailablePort();
     const safeBranch = branch.replace(/\//g, "-");
-    const worktreePath = path.join(env.WORKTREE_BASE_DIR, `${env.PROJECT_NAME}-${safeBranch}`);
+    const worktreePath = path.join(
+      env.WORKTREE_BASE_DIR,
+      `${env.PROJECT_NAME}-${safeBranch}`,
+    );
 
     // Create git worktree if path doesn't exist
     if (!fs.existsSync(worktreePath)) {
@@ -67,15 +76,20 @@ export async function POST(request: Request) {
     const planDir = path.join(PLAN_DIR, "active", branch);
     if (fs.existsSync(planDir)) {
       const targetDir = path.join(worktreePath, "plan");
-      if (!fs.existsSync(targetDir)) fs.mkdirSync(targetDir, { recursive: true });
-      const planFiles = fs.readdirSync(planDir).filter((f) => !f.startsWith("."));
+      if (!fs.existsSync(targetDir))
+        fs.mkdirSync(targetDir, { recursive: true });
+      const planFiles = fs
+        .readdirSync(planDir)
+        .filter((f) => !f.startsWith("."));
       for (const file of planFiles) {
         fs.copyFileSync(path.join(planDir, file), path.join(targetDir, file));
       }
     }
 
     // Remove from deactive
-    const deactive = readJson<DeactiveBranch>("deactive.json").filter((d) => d.branch !== branch);
+    const deactive = readJson<DeactiveBranch>("deactive.json").filter(
+      (d) => d.branch !== branch,
+    );
     writeJson("deactive.json", deactive);
 
     // Add to active
@@ -88,6 +102,7 @@ export async function POST(request: Request) {
       status: "stopped" as const,
       pid: null,
       createdAt: new Date().toISOString().split("T")[0],
+      healthCheckPath: healthCheckPath || undefined,
     };
     active.push(worktree);
     writeJson("active.json", active);

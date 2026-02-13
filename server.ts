@@ -1,5 +1,6 @@
 import { createServer } from "http";
 import { parse } from "url";
+import fs from "fs";
 import path from "path";
 import next from "next";
 import { WebSocketServer } from "ws";
@@ -89,6 +90,11 @@ app.prepare().then(async () => {
   server.listen(port, async () => {
     console.log(`> Worktree Handler ready on http://${hostname}:${port}`);
 
+    // Ensure plan directories exist
+    const planBase = path.resolve(process.cwd(), "plan");
+    fs.mkdirSync(path.join(planBase, "active"), { recursive: true });
+    fs.mkdirSync(path.join(planBase, "ended"), { recursive: true });
+
     const { env } = await import("./src/lib/env");
     const { classifyBranches } = await import("./src/lib/classifier");
     const { readJson, writeJson } = await import("./src/lib/store");
@@ -122,7 +128,8 @@ app.prepare().then(async () => {
         try {
           const controller = new AbortController();
           const timeout = setTimeout(() => controller.abort(), 5000);
-          const res = await fetch(`http://localhost:${worktree.port}${env.HEALTHCHECK_PATH}`, {
+          const healthPath = worktree.healthCheckPath || env.HEALTHCHECK_PATH;
+          const res = await fetch(`http://localhost:${worktree.port}${healthPath}`, {
             signal: controller.signal,
           });
           clearTimeout(timeout);

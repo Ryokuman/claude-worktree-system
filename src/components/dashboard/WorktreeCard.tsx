@@ -3,21 +3,21 @@
 import { useState } from "react";
 import Link from "next/link";
 import type { ActiveWorktree } from "@/lib/types";
-import { StatusBadge } from "./StatusBadge";
 
 interface WorktreeCardProps {
   worktree: ActiveWorktree;
   onRefresh: () => void;
-  onOpenTerminal: (branch: string) => void;
 }
 
-export function WorktreeCard({ worktree, onRefresh, onOpenTerminal }: WorktreeCardProps) {
+export function WorktreeCard({ worktree, onRefresh }: WorktreeCardProps) {
   const [loading, setLoading] = useState(false);
 
   async function handleStart() {
     setLoading(true);
     try {
-      await fetch(`/api/worktrees/${worktree.taskNo}/start`, { method: "POST" });
+      await fetch(`/api/worktrees/${worktree.taskNo}/start`, {
+        method: "POST",
+      });
       onRefresh();
     } finally {
       setLoading(false);
@@ -35,10 +35,17 @@ export function WorktreeCard({ worktree, onRefresh, onOpenTerminal }: WorktreeCa
   }
 
   async function handleComplete() {
-    if (!confirm(`"${worktree.taskNo} ${worktree.taskName}" 작업을 완료 처리하시겠습니까?`)) return;
+    if (
+      !confirm(
+        `"${worktree.taskNo} ${worktree.taskName}" 작업을 완료 처리하시겠습니까?`,
+      )
+    )
+      return;
     setLoading(true);
     try {
-      await fetch(`/api/worktrees/${worktree.taskNo}/complete`, { method: "POST" });
+      await fetch(`/api/worktrees/${worktree.taskNo}/complete`, {
+        method: "POST",
+      });
       onRefresh();
     } finally {
       setLoading(false);
@@ -62,11 +69,12 @@ export function WorktreeCard({ worktree, onRefresh, onOpenTerminal }: WorktreeCa
             {worktree.taskNo}
           </span>
         )}
-        <span className="text-sm text-gray-300 truncate">{worktree.taskName}</span>
+        <span className="text-sm text-gray-300 truncate">
+          {worktree.taskName}
+        </span>
       </div>
 
       <div className="flex items-center gap-3 shrink-0">
-        {/* Plan: show link or create button */}
         {worktree.hasPlan ? (
           <Link
             href={`/plan/${encodeURIComponent(worktree.branch)}`}
@@ -75,15 +83,25 @@ export function WorktreeCard({ worktree, onRefresh, onOpenTerminal }: WorktreeCa
             plan
           </Link>
         ) : (
-          <button
-            onClick={() => onOpenTerminal(worktree.branch)}
+          <Link
+            href={`/plan/${encodeURIComponent(worktree.branch)}`}
             className="rounded px-2 py-1 text-xs font-medium bg-purple-900/50 text-purple-400 hover:bg-purple-900 transition-colors"
           >
             + plan
-          </button>
+          </Link>
         )}
 
-        <StatusBadge status={worktree.status} />
+        {worktree.status === "running" ? (
+          <span className="inline-flex items-center gap-1.5 text-xs font-medium text-green-400">
+            <span className="h-2 w-2 rounded-full bg-green-400 animate-pulse" />
+            running
+          </span>
+        ) : (
+          <span className="inline-flex items-center gap-1.5 text-xs font-medium text-gray-500">
+            <span className="h-2 w-2 rounded-full bg-gray-500" />
+            stopped
+          </span>
+        )}
 
         <div className="flex items-center gap-1">
           {worktree.status === "stopped" ? (

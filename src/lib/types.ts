@@ -8,6 +8,7 @@ export interface ActiveWorktree {
   pid: number | null;
   createdAt: string;
   hasPlan?: boolean;
+  healthCheckPath?: string;
 }
 
 export interface DeactiveBranch {

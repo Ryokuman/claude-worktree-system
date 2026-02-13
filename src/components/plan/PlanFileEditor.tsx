@@ -9,7 +9,11 @@ interface PlanFileEditorProps {
   onCancel: () => void;
 }
 
-export function PlanFileEditor({ file, onSave, onCancel }: PlanFileEditorProps) {
+export function PlanFileEditor({
+  file,
+  onSave,
+  onCancel,
+}: PlanFileEditorProps) {
   const [content, setContent] = useState(file.content);
 
   return (
