@@ -1,8 +1,18 @@
 import fs from "fs";
 import path from "path";
-import type { PlanFile } from "./types";
+import type { PlanFile, PlanJson } from "./types";
 
 const PLAN_DIR = path.resolve(process.cwd(), "plan");
+
+export function readPlanJson(branch: string): PlanJson | null {
+  const filePath = path.join(PLAN_DIR, "active", branch, "plan.json");
+  if (!fs.existsSync(filePath)) return null;
+  try {
+    return JSON.parse(fs.readFileSync(filePath, "utf-8"));
+  } catch {
+    return null;
+  }
+}
 
 export function listPlanFiles(branch: string): PlanFile[] {
   const dir = path.join(PLAN_DIR, "active", branch);

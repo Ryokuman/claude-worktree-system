@@ -31,3 +31,22 @@ export interface PlanFile {
   content: string;
   updatedAt: string;
 }
+
+export type PlanStepStatus = "pending" | "in_progress" | "done";
+
+export interface PlanStep {
+  id: string;
+  title: string;
+  file: string;
+  status: PlanStepStatus;
+}
+
+export interface PlanJson {
+  title: string;
+  steps: PlanStep[];
+}
+
+export type PlanResponse =
+  | { type: "structured"; plan: PlanJson; files: PlanFile[] }
+  | { type: "raw"; files: PlanFile[] }
+  | { type: "empty" };
