@@ -1,10 +1,10 @@
 import { env } from "./env";
-import { store } from "./store";
+import { getActive, updateActive } from "./store";
 
 let intervalId: ReturnType<typeof setInterval> | null = null;
 
 async function checkHealth(): Promise<void> {
-  const active = store.getActive();
+  const active = getActive();
   const running = active.filter((w) => w.status === "running");
 
   for (const worktree of running) {
@@ -20,11 +20,11 @@ async function checkHealth(): Promise<void> {
 
       if (!res.ok) {
         console.log(`[health] ${worktree.taskNo} unhealthy (status ${res.status})`);
-        store.updateActive(worktree.taskNo, { status: "stopped", pid: null });
+        updateActive(worktree.taskNo, { status: "stopped", pid: null });
       }
     } catch {
       console.log(`[health] ${worktree.taskNo} unreachable, marking as stopped`);
-      store.updateActive(worktree.taskNo, { status: "stopped", pid: null });
+      updateActive(worktree.taskNo, { status: "stopped", pid: null });
     }
   }
 }

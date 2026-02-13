@@ -1,16 +1,29 @@
 import { NextResponse } from "next/server";
-import { store } from "@/lib/store";
+import { getActive, removeActive, addEnded } from "@/lib/store";
 import { stopDevServer } from "@/lib/process-manager";
 import { archivePlan } from "@/lib/plan-manager";
 
-// POST /api/worktrees/[taskNo]/complete (A13)
+/**
+ * POST /api/worktrees/:taskNo/complete
+ *
+ * 워크트리 작업을 완료 처리한다. (A13)
+ * 1. running이면 서버 중지
+ * 2. active에서 제거 → ended에 추가
+ * 3. plan/active/{branch}/ → plan/ended/{branch}/ 아카이브
+ *
+ * Params: taskNo - 워크트리 식별자
+ *
+ * Response 200: { status: "completed", taskNo: string }
+ * Response 404: { error: "Worktree not found" }
+ * Response 500: { error: string }
+ */
 export async function POST(
   _request: Request,
   { params }: { params: Promise<{ taskNo: string }> }
 ) {
   try {
     const { taskNo } = await params;
-    const worktree = store.getActive().find((w) => w.taskNo === taskNo);
+    const worktree = getActive().find((w) => w.taskNo === taskNo);
     if (!worktree) {
       return NextResponse.json({ error: "Worktree not found" }, { status: 404 });
     }
@@ -25,13 +38,13 @@ export async function POST(
     }
 
     // Remove from active
-    store.removeActive(taskNo);
+    removeActive(taskNo);
 
     // Archive plan
     archivePlan(worktree.branch);
 
     // Add to ended
-    store.addEnded({
+    addEnded({
       taskNo: worktree.taskNo,
       taskName: worktree.taskName,
       branch: worktree.branch,

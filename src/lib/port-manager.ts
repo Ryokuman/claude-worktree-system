@@ -1,6 +1,6 @@
 import net from "net";
 import { env } from "./env";
-import { store } from "./store";
+import { getActive } from "./store";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise((resolve) => {
@@ -15,7 +15,7 @@ function isPortAvailable(port: number): Promise<boolean> {
 
 export async function findAvailablePort(): Promise<number> {
   const { PORT_RANGE_START, PORT_RANGE_END } = env;
-  const usedPorts = new Set(store.getActive().map((w) => w.port));
+  const usedPorts = new Set(getActive().map((w) => w.port));
 
   for (let port = PORT_RANGE_START; port <= PORT_RANGE_END; port++) {
     if (usedPorts.has(port)) continue;

@@ -1,12 +1,20 @@
 import { spawn, execSync } from "child_process";
 import fs from "fs";
 import path from "path";
-import { store } from "./store";
+import { getActive, updateActive } from "./store";
+import { findAvailablePort } from "./port-manager";
 
 export async function startDevServer(taskNo: string): Promise<void> {
-  const worktree = store.getActive().find((w) => w.taskNo === taskNo);
+  const worktree = getActive().find((w) => w.taskNo === taskNo);
   if (!worktree) throw new Error(`Worktree ${taskNo} not found`);
   if (worktree.status === "running") throw new Error(`${taskNo} is already running`);
+
+  // Assign port if not yet assigned
+  if (!worktree.port) {
+    const port = await findAvailablePort();
+    updateActive(taskNo, { port });
+    worktree.port = port;
+  }
 
   // Install deps if node_modules missing
   const nodeModulesPath = path.join(worktree.path, "node_modules");
@@ -24,7 +32,7 @@ export async function startDevServer(taskNo: string): Promise<void> {
 
   child.unref();
 
-  store.updateActive(taskNo, {
+  updateActive(taskNo, {
     status: "running",
     pid: child.pid || null,
   });
@@ -33,7 +41,7 @@ export async function startDevServer(taskNo: string): Promise<void> {
 }
 
 export function stopDevServer(taskNo: string): void {
-  const worktree = store.getActive().find((w) => w.taskNo === taskNo);
+  const worktree = getActive().find((w) => w.taskNo === taskNo);
   if (!worktree) throw new Error(`Worktree ${taskNo} not found`);
   if (!worktree.pid) throw new Error(`${taskNo} has no running process`);
 
@@ -48,7 +56,7 @@ export function stopDevServer(taskNo: string): void {
     }
   }
 
-  store.updateActive(taskNo, {
+  updateActive(taskNo, {
     status: "stopped",
     pid: null,
   });
