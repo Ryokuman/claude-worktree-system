@@ -10,8 +10,8 @@ out/
 .env.local
 
 # data (runtime)
-work-trees/
-plan/
+/work-trees/
+/plan/
 
 # logs
 *.log
