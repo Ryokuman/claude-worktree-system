@@ -23,6 +23,9 @@ cd claude-worktree-system
 npm install
 ```
 
+> **주의: `sudo npm install` 하지 마세요.** node-pty 네이티브 바이너리의 실행 권한이 빠져서 터미널이 동작하지 않습니다.
+> npm 권한 에러가 나면 `sudo chown -R $(whoami) ~/.npm` 후 다시 `npm install` 하세요.
+
 ### 2. Configure
 
 ```bash
