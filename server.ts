@@ -90,7 +90,7 @@ app.prepare().then(async () => {
 
     const { env } = await import("./src/lib/env");
     const { classifyBranches } = await import("./src/lib/classifier");
-    const { getActive, updateActive } = await import("./src/lib/store");
+    const { readJson, writeJson } = await import("./src/lib/store");
 
     // --- Git watcher (inline of initWatcher) ---
     const refsPath = path.join(env.MAIN_REPO_PATH, ".git", "refs");
@@ -116,7 +116,7 @@ app.prepare().then(async () => {
     // --- Health checker (inline of startHealthChecker) ---
     console.log(`[health] Starting health checker (interval: ${env.HEALTHCHECK_INTERVAL}ms)`);
     setInterval(async () => {
-      const running = getActive().filter((w) => w.status === "running");
+      const running = (readJson("active.json") as any[]).filter((w) => w.status === "running");
       for (const worktree of running) {
         try {
           const controller = new AbortController();
@@ -127,11 +127,15 @@ app.prepare().then(async () => {
           clearTimeout(timeout);
           if (!res.ok) {
             console.log(`[health] ${worktree.taskNo} unhealthy (status ${res.status})`);
-            updateActive(worktree.taskNo, { status: "stopped", pid: null });
+            const active = readJson("active.json") as any[];
+            const wt = active.find((w) => w.taskNo === worktree.taskNo);
+            if (wt) { wt.status = "stopped"; wt.pid = null; writeJson("active.json", active); }
           }
         } catch {
           console.log(`[health] ${worktree.taskNo} unreachable, marking as stopped`);
-          updateActive(worktree.taskNo, { status: "stopped", pid: null });
+          const active = readJson("active.json") as any[];
+          const wt = active.find((w) => w.taskNo === worktree.taskNo);
+          if (wt) { wt.status = "stopped"; wt.pid = null; writeJson("active.json", active); }
         }
       }
     }, env.HEALTHCHECK_INTERVAL);

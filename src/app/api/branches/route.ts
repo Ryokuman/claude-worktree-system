@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { getDeactive } from "@/lib/store";
+import { readJson } from "@/lib/store";
+import type { DeactiveBranch } from "@/lib/types";
 
 /**
  * GET /api/branches
@@ -10,5 +11,5 @@ import { getDeactive } from "@/lib/store";
  * Response 200: DeactiveBranch[]
  */
 export async function GET() {
-  return NextResponse.json(getDeactive());
+  return NextResponse.json(readJson<DeactiveBranch>("deactive.json"));
 }

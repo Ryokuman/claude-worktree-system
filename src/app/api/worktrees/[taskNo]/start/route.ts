@@ -2,8 +2,9 @@ import { NextResponse } from "next/server";
 import { spawn, execSync } from "child_process";
 import fs from "fs";
 import path from "path";
-import { getActive, updateActive } from "@/lib/store";
+import { readJson, writeJson } from "@/lib/store";
 import { findAvailablePort } from "@/lib/port-manager";
+import type { ActiveWorktree } from "@/lib/types";
 
 /**
  * POST /api/worktrees/:taskNo/start
@@ -22,15 +23,15 @@ export async function POST(
 ) {
   try {
     const { taskNo } = await params;
-    const worktree = getActive().find((w) => w.taskNo === taskNo);
+    const active = readJson<ActiveWorktree>("active.json");
+    const worktree = active.find((w) => w.taskNo === taskNo);
     if (!worktree) throw new Error(`Worktree ${taskNo} not found`);
     if (worktree.status === "running") throw new Error(`${taskNo} is already running`);
 
     // Assign port if not yet assigned
     if (!worktree.port) {
-      const port = await findAvailablePort();
-      updateActive(taskNo, { port });
-      worktree.port = port;
+      worktree.port = await findAvailablePort();
+      writeJson("active.json", active);
     }
 
     // Install deps if node_modules missing
@@ -49,10 +50,9 @@ export async function POST(
 
     child.unref();
 
-    updateActive(taskNo, {
-      status: "running",
-      pid: child.pid || null,
-    });
+    worktree.status = "running";
+    worktree.pid = child.pid || null;
+    writeJson("active.json", active);
 
     console.log(`[process] Started dev server for ${taskNo} on port ${worktree.port} (PID: ${child.pid})`);
     return NextResponse.json({ status: "started", taskNo });

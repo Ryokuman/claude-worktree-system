@@ -1,7 +1,9 @@
-import { getActive, updateActive } from "./store";
+import { readJson, writeJson } from "./store";
+import type { ActiveWorktree } from "./types";
 
 export function stopDevServer(taskNo: string): void {
-  const worktree = getActive().find((w) => w.taskNo === taskNo);
+  const active = readJson<ActiveWorktree>("active.json");
+  const worktree = active.find((w) => w.taskNo === taskNo);
   if (!worktree) throw new Error(`Worktree ${taskNo} not found`);
   if (!worktree.pid) throw new Error(`${taskNo} has no running process`);
 
@@ -15,10 +17,9 @@ export function stopDevServer(taskNo: string): void {
     }
   }
 
-  updateActive(taskNo, {
-    status: "stopped",
-    pid: null,
-  });
+  worktree.status = "stopped";
+  worktree.pid = null;
+  writeJson("active.json", active);
 
   console.log(`[process] Stopped dev server for ${taskNo}`);
 }

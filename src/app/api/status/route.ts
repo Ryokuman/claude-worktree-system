@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
-import { getActive, getDeactive, getEnded } from "@/lib/store";
+import { readJson } from "@/lib/store";
 import { listPlanFiles } from "@/lib/plan-manager";
+import type { ActiveWorktree, DeactiveBranch, EndedWorktree } from "@/lib/types";
 
 /**
  * GET /api/status
@@ -13,14 +14,14 @@ import { listPlanFiles } from "@/lib/plan-manager";
  * Response 200: { active: ActiveWorktree[], deactive: DeactiveBranch[], ended: EndedWorktree[] }
  */
 export async function GET() {
-  const active = getActive().map((w) => ({
+  const active = readJson<ActiveWorktree>("active.json").map((w) => ({
     ...w,
     hasPlan: listPlanFiles(w.branch).length > 0,
   }));
 
   return NextResponse.json({
     active,
-    deactive: getDeactive(),
-    ended: getEnded(),
+    deactive: readJson<DeactiveBranch>("deactive.json"),
+    ended: readJson<EndedWorktree>("ended.json"),
   });
 }

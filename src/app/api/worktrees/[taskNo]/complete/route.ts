@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
-import { getActive, setActive, getEnded, setEnded } from "@/lib/store";
+import { readJson, writeJson } from "@/lib/store";
 import { stopDevServer } from "@/lib/process-manager";
+import type { ActiveWorktree, EndedWorktree } from "@/lib/types";
 
 const PLAN_DIR = path.resolve(process.cwd(), "plan");
 
@@ -26,12 +27,12 @@ export async function POST(
 ) {
   try {
     const { taskNo } = await params;
-    const activeList = getActive();
-    const idx = activeList.findIndex((w) => w.taskNo === taskNo);
+    const active = readJson<ActiveWorktree>("active.json");
+    const idx = active.findIndex((w) => w.taskNo === taskNo);
     if (idx === -1) {
       return NextResponse.json({ error: "Worktree not found" }, { status: 404 });
     }
-    const worktree = activeList[idx];
+    const worktree = active[idx];
 
     // Stop server if running
     if (worktree.status === "running" && worktree.pid) {
@@ -43,8 +44,8 @@ export async function POST(
     }
 
     // Remove from active
-    activeList.splice(idx, 1);
-    setActive(activeList);
+    active.splice(idx, 1);
+    writeJson("active.json", active);
 
     // Archive plan: plan/active/{branch} → plan/ended/{branch}
     const activeDir = path.join(PLAN_DIR, "active", worktree.branch);
@@ -59,14 +60,14 @@ export async function POST(
     }
 
     // Add to ended
-    const endedList = getEnded();
-    endedList.push({
+    const ended = readJson<EndedWorktree>("ended.json");
+    ended.push({
       taskNo: worktree.taskNo,
       taskName: worktree.taskName,
       branch: worktree.branch,
       completedAt: new Date().toISOString().split("T")[0],
     });
-    setEnded(endedList);
+    writeJson("ended.json", ended);
 
     return NextResponse.json({ status: "completed", taskNo });
   } catch (err: unknown) {

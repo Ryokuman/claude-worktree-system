@@ -2,10 +2,11 @@ import { NextResponse } from "next/server";
 import { execSync } from "child_process";
 import fs from "fs";
 import path from "path";
-import { getActive, getDeactive, setDeactive, addActive } from "@/lib/store";
+import { readJson, writeJson } from "@/lib/store";
 import { extractTaskNo, branchToTaskName } from "@/lib/task-utils";
 import { findAvailablePort } from "@/lib/port-manager";
 import { env } from "@/lib/env";
+import type { ActiveWorktree, DeactiveBranch } from "@/lib/types";
 
 const PLAN_DIR = path.resolve(process.cwd(), "plan");
 
@@ -17,7 +18,7 @@ const PLAN_DIR = path.resolve(process.cwd(), "plan");
  * Response 200: ActiveWorktree[]
  */
 export async function GET() {
-  return NextResponse.json(getActive());
+  return NextResponse.json(readJson<ActiveWorktree>("active.json"));
 }
 
 /**
@@ -43,9 +44,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "branch is required" }, { status: 400 });
     }
 
-    // Check if already active
-    const existing = getActive().find((w) => w.branch === branch);
-    if (existing) {
+    const active = readJson<ActiveWorktree>("active.json");
+    if (active.find((w) => w.branch === branch)) {
       return NextResponse.json({ error: "Branch already active" }, { status: 409 });
     }
 
@@ -75,8 +75,8 @@ export async function POST(request: Request) {
     }
 
     // Remove from deactive
-    const deactive = getDeactive().filter((d) => d.branch !== branch);
-    setDeactive(deactive);
+    const deactive = readJson<DeactiveBranch>("deactive.json").filter((d) => d.branch !== branch);
+    writeJson("deactive.json", deactive);
 
     // Add to active
     const worktree = {
@@ -89,7 +89,8 @@ export async function POST(request: Request) {
       pid: null,
       createdAt: new Date().toISOString().split("T")[0],
     };
-    addActive(worktree);
+    active.push(worktree);
+    writeJson("active.json", active);
 
     return NextResponse.json(worktree, { status: 201 });
   } catch (err: unknown) {

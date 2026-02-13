@@ -1,6 +1,7 @@
 import { execSync } from "child_process";
 import { extractTaskNo, resetTTNCounter, branchToTaskName } from "./task-utils";
-import { getActive, setActive, setDeactive, addActive } from "./store";
+import { readJson, writeJson } from "./store";
+import type { ActiveWorktree } from "./types";
 import { env } from "./env";
 import type { DeactiveBranch } from "./types";
 
@@ -85,7 +86,7 @@ export function classifyBranches(): void {
 
     const branches = listBranches();
     const worktrees = listWorktrees();
-    const active = getActive();
+    const active = readJson<ActiveWorktree>("active.json");
     const activeBranches = new Set(active.map((w) => w.branch));
 
     // Auto-register existing git worktrees that aren't in active.json
@@ -98,7 +99,8 @@ export function classifyBranches(): void {
       const taskNo = extractTaskNo(wt.branch);
       const taskName = branchToTaskName(wt.branch);
 
-      addActive({
+      const list = readJson<ActiveWorktree>("active.json");
+      list.push({
         taskNo,
         taskName,
         branch: wt.branch,
@@ -108,6 +110,7 @@ export function classifyBranches(): void {
         pid: null,
         createdAt: new Date().toISOString().split("T")[0],
       });
+      writeJson("active.json", list);
       activeBranches.add(wt.branch);
       console.log(`[classifier] Auto-registered existing worktree: ${wt.branch}`);
     }
@@ -127,14 +130,14 @@ export function classifyBranches(): void {
       });
     }
 
-    setDeactive(sortDeactive(deactive));
+    writeJson("deactive.json", sortDeactive(deactive));
 
     // Remove active entries whose branches no longer exist
     const allBranchNames = new Set(branches.map((b) => b.name));
-    const currentActive = getActive();
+    const currentActive = readJson<ActiveWorktree>("active.json");
     const stillValid = currentActive.filter((w) => allBranchNames.has(w.branch));
     if (stillValid.length !== currentActive.length) {
-      setActive(stillValid);
+      writeJson("active.json", stillValid);
     }
   } catch (err) {
     console.error("[classifier] Error classifying branches:", err);

@@ -1,4 +1,5 @@
-import { getActive, getEnded } from "./store";
+import { readJson } from "./store";
+import type { ActiveWorktree, EndedWorktree } from "./types";
 
 const DV_PATTERN = /DV-(\d+)/i;
 
@@ -7,8 +8,8 @@ let ttnCounter = 0;
 export function resetTTNCounter(): void {
   // Only count active/ended (persistent). Deactive is rebuilt each time.
   const all = [
-    ...getActive().map((w) => w.taskNo),
-    ...getEnded().map((w) => w.taskNo),
+    ...readJson<ActiveWorktree>("active.json").map((w) => w.taskNo),
+    ...readJson<EndedWorktree>("ended.json").map((w) => w.taskNo),
   ];
 
   const existingTTNs = all
