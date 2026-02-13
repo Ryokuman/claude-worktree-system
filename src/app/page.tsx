@@ -2,15 +2,25 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { WorktreeCard } from "@/components/dashboard/WorktreeCard";
 import { AddWorktreeDialog } from "@/components/dashboard/AddWorktreeDialog";
 import type { ActiveWorktree, DeactiveBranch } from "@/lib/types";
+
+const TerminalModal = dynamic(
+  () =>
+    import("@/components/terminal/TerminalModal").then(
+      (mod) => mod.TerminalModal,
+    ),
+  { ssr: false },
+);
 
 export default function DashboardPage() {
   const [active, setActive] = useState<ActiveWorktree[]>([]);
   const [deactive, setDeactive] = useState<DeactiveBranch[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddDialog, setShowAddDialog] = useState(false);
+  const [showTerminal, setShowTerminal] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
   const fetchStatus = useCallback(async () => {
@@ -104,6 +114,22 @@ export default function DashboardPage() {
           = stopped
         </span>
       </div>
+
+      {/* TODO: temp terminal test - 제거 예정 */}
+      <button
+        onClick={() => setShowTerminal(true)}
+        className="mt-4 rounded-lg px-3 py-1.5 text-xs font-medium bg-orange-900/50 text-orange-400 hover:bg-orange-900 transition-colors"
+      >
+        Terminal Test
+      </button>
+
+      {showTerminal && (
+        <TerminalModal
+          title="Terminal Test"
+          cwd="/tmp"
+          onClose={() => setShowTerminal(false)}
+        />
+      )}
 
       {showAddDialog && (
         <AddWorktreeDialog

@@ -6,18 +6,27 @@ import { FitAddon } from "@xterm/addon-fit";
 import "@xterm/xterm/css/xterm.css";
 
 export interface TerminalOptions {
-  sessionId: string;
+  cwd?: string;
+  initialCommand?: string;
+}
+
+function safeFit(fitAddon: FitAddon) {
+  try {
+    fitAddon.fit();
+  } catch {
+    // Renderer not ready yet — will fit on next resize
+  }
 }
 
 export function useTerminal(
   containerRef: React.RefObject<HTMLDivElement | null>,
-  options: TerminalOptions,
+  options: TerminalOptions = {},
 ) {
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
 
-    const terminal = new Terminal({
+    const term = new Terminal({
       cursorBlink: true,
       fontSize: 14,
       fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
@@ -30,49 +39,57 @@ export function useTerminal(
     });
 
     const fitAddon = new FitAddon();
-    terminal.loadAddon(fitAddon);
-    terminal.open(container);
-    fitAddon.fit();
+    term.loadAddon(fitAddon);
+    term.open(container);
 
-    // WebSocket connection
-    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const wsUrl = `${protocol}//${window.location.host}/ws/terminal/${options.sessionId}`;
+    // Delay initial fit — renderer needs one frame after open() to initialize
+    const rafId = requestAnimationFrame(() => safeFit(fitAddon));
+
+    // Build WebSocket URL
+    const params = new URLSearchParams();
+    if (options.cwd) params.set("cwd", options.cwd);
+    if (options.initialCommand)
+      params.set("initialCommand", options.initialCommand);
+    const query = params.toString();
+    const protocol =
+      window.location.protocol === "https:" ? "wss:" : "ws:";
+    const wsUrl = `${protocol}//${window.location.host}/ws/terminal${query ? `?${query}` : ""}`;
     const ws = new WebSocket(wsUrl);
 
     ws.onopen = () => {
       ws.send(
         JSON.stringify({
           type: "resize",
-          cols: terminal.cols,
-          rows: terminal.rows,
+          cols: term.cols,
+          rows: term.rows,
         }),
       );
     };
 
     ws.onmessage = (event) => {
-      terminal.write(event.data);
+      term.write(event.data);
     };
 
     ws.onclose = () => {
-      terminal.write("\r\n\x1b[33m[Connection closed]\x1b[0m\r\n");
+      term.write("\r\n\x1b[33m[Connection closed]\x1b[0m\r\n");
     };
 
-    // Terminal → WebSocket
-    terminal.onData((data) => {
+    term.onData((data) => {
       if (ws.readyState === WebSocket.OPEN) {
         ws.send(data);
       }
     });
 
-    // Handle resize
+    // Resize handling — ResizeObserver fires immediately on observe(),
+    // so safeFit protects against renderer not being ready yet
     const resizeObserver = new ResizeObserver(() => {
-      fitAddon.fit();
+      safeFit(fitAddon);
       if (ws.readyState === WebSocket.OPEN) {
         ws.send(
           JSON.stringify({
             type: "resize",
-            cols: terminal.cols,
-            rows: terminal.rows,
+            cols: term.cols,
+            rows: term.rows,
           }),
         );
       }
@@ -80,9 +97,10 @@ export function useTerminal(
     resizeObserver.observe(container);
 
     return () => {
+      cancelAnimationFrame(rafId);
       resizeObserver.disconnect();
       ws.close();
-      terminal.dispose();
+      term.dispose();
     };
-  }, [containerRef, options.sessionId]);
+  }, [containerRef, options.cwd, options.initialCommand]);
 }

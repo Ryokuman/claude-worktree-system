@@ -1,20 +1,20 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
-import { useTerminal } from "./useTerminal";
+import { useRef } from "react";
+import { useTerminal, type TerminalOptions } from "./useTerminal";
+
+function TerminalMount({ options }: { options: TerminalOptions }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  useTerminal(containerRef, options);
+  return <div ref={containerRef} className="h-full w-full" />;
+}
 
 interface TerminalModalProps {
   title: string;
-  cwd: string;
+  cwd?: string;
   initialCommand?: string;
   closeLabel?: string;
   onClose: () => void;
-}
-
-function TerminalMount({ sessionId }: { sessionId: string }) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  useTerminal(containerRef, { sessionId });
-  return <div ref={containerRef} className="h-full w-full" />;
 }
 
 export function TerminalModal({
@@ -24,27 +24,6 @@ export function TerminalModal({
   closeLabel = "Close",
   onClose,
 }: TerminalModalProps) {
-  const [sessionId, setSessionId] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    async function createSession() {
-      try {
-        const res = await fetch("/api/terminal", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ cwd, initialCommand }),
-        });
-        if (!res.ok) throw new Error("Failed to create terminal session");
-        const data = await res.json();
-        setSessionId(data.id);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Unknown error");
-      }
-    }
-    createSession();
-  }, [cwd, initialCommand]);
-
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-black/90">
       <div className="flex items-center justify-between px-4 py-2 bg-gray-900 border-b border-gray-800">
@@ -59,10 +38,7 @@ export function TerminalModal({
         </button>
       </div>
       <div className="flex-1 p-1">
-        {error && (
-          <div className="p-4 text-red-400 text-sm">Error: {error}</div>
-        )}
-        {sessionId && <TerminalMount sessionId={sessionId} />}
+        <TerminalMount options={{ cwd, initialCommand }} />
       </div>
     </div>
   );

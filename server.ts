@@ -24,11 +24,11 @@ app.prepare().then(async () => {
 
   const wss = new WebSocketServer({ noServer: true });
 
-  // WebSocket upgrade: only intercept /ws/terminal/{sessionId}
+  // WebSocket upgrade: intercept /ws/terminal
   server.on("upgrade", (req, socket, head) => {
     const { pathname } = parse(req.url || "", true);
 
-    if (pathname?.startsWith("/ws/terminal/")) {
+    if (pathname === "/ws/terminal") {
       wss.handleUpgrade(req, socket, head, (ws) => {
         wss.emit("connection", ws, req);
       });
@@ -37,52 +37,58 @@ app.prepare().then(async () => {
     }
   });
 
-  // Handle terminal WebSocket connections
-  wss.on("connection", (ws, req) => {
-    const { pathname } = parse(req.url || "", true);
-    const sessionId = pathname?.split("/ws/terminal/")[1];
+  // Handle terminal WebSocket connections — spawn PTY directly
+  wss.on("connection", async (ws, req) => {
+    const { query } = parse(req.url || "", true);
+    const cwd = (query.cwd as string) || process.env.HOME || "/tmp";
+    const initialCommand = query.initialCommand as string | undefined;
+    const shell = process.env.SHELL || "/bin/zsh";
 
-    if (!sessionId) {
-      ws.close(1008, "Missing session ID");
+    let ptyProcess: import("node-pty").IPty;
+    try {
+      const pty = await import("node-pty");
+      ptyProcess = pty.spawn(shell, [], {
+        name: "xterm-256color",
+        cols: 120,
+        rows: 30,
+        cwd,
+        env: { ...process.env, TERM: "xterm-256color" } as Record<string, string>,
+      });
+    } catch (e) {
+      ws.send(`\r\n\x1b[31mFailed to spawn shell: ${e}\x1b[0m\r\n`);
+      ws.close();
       return;
     }
 
-    // Lazy-load terminal manager to avoid circular deps
-    import("./src/lib/terminal-manager").then(({ terminalManager }) => {
-      const session = terminalManager.getSession(sessionId);
-      if (!session) {
-        ws.close(1008, "Session not found");
-        return;
+    if (initialCommand) {
+      ptyProcess.write(initialCommand + "\n");
+    }
+
+    // PTY → WebSocket
+    const dataHandler = ptyProcess.onData((data: string) => {
+      if (ws.readyState === ws.OPEN) {
+        ws.send(data);
       }
+    });
 
-      const { pty } = session;
-
-      // PTY → WebSocket
-      const dataHandler = pty.onData((data: string) => {
-        if (ws.readyState === ws.OPEN) {
-          ws.send(data);
+    // WebSocket → PTY
+    ws.on("message", (msg) => {
+      const message = msg.toString();
+      try {
+        const parsed = JSON.parse(message);
+        if (parsed.type === "resize" && parsed.cols && parsed.rows) {
+          ptyProcess.resize(parsed.cols, parsed.rows);
+          return;
         }
-      });
+      } catch {
+        // Not JSON, treat as regular input
+      }
+      ptyProcess.write(message);
+    });
 
-      // WebSocket → PTY
-      ws.on("message", (msg) => {
-        const message = msg.toString();
-        try {
-          const parsed = JSON.parse(message);
-          if (parsed.type === "resize" && parsed.cols && parsed.rows) {
-            pty.resize(parsed.cols, parsed.rows);
-            return;
-          }
-        } catch {
-          // Not JSON, treat as regular input
-        }
-        pty.write(message);
-      });
-
-      ws.on("close", () => {
-        dataHandler.dispose();
-        terminalManager.destroySession(sessionId);
-      });
+    ws.on("close", () => {
+      dataHandler.dispose();
+      ptyProcess.kill();
     });
   });
 
