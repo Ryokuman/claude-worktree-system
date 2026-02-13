@@ -9,6 +9,7 @@ interface PlanStructuredViewProps {
   plan: PlanJson;
   files: PlanFile[];
   onRefresh: () => void;
+  onOpenAI?: () => void;
 }
 
 const STATUS_CONFIG: Record<
@@ -40,6 +41,7 @@ export function PlanStructuredView({
   plan,
   files,
   onRefresh,
+  onOpenAI,
 }: PlanStructuredViewProps) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -86,9 +88,9 @@ export function PlanStructuredView({
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-lg font-semibold text-gray-100">{plan.title}</h2>
         <button
-          disabled
-          className="rounded-lg px-3 py-1.5 text-xs font-medium bg-purple-900/50 text-purple-400 opacity-50 cursor-not-allowed"
-          title="터미널 연동 후 사용 가능"
+          onClick={onOpenAI}
+          disabled={!onOpenAI}
+          className="rounded-lg px-3 py-1.5 text-xs font-medium bg-purple-600 text-white hover:bg-purple-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
           AI로 플랜 만들기
         </button>

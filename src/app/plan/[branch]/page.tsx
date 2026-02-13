@@ -2,9 +2,18 @@
 
 import { useState, useEffect, useCallback, use } from "react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { PlanStructuredView } from "@/components/plan/PlanStructuredView";
 import { PlanFileEditor } from "@/components/plan/PlanFileEditor";
 import type { PlanResponse, PlanFile } from "@/lib/types";
+
+const TerminalDialog = dynamic(
+  () =>
+    import("@/components/terminal/TerminalDialog").then(
+      (mod) => mod.TerminalDialog,
+    ),
+  { ssr: false },
+);
 
 export default function PlanPage({
   params,
@@ -18,6 +27,8 @@ export default function PlanPage({
   const [viewMode, setViewMode] = useState<"structured" | "raw">("structured");
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
+  const [showTerminal, setShowTerminal] = useState(false);
+  const [worktreePath, setWorktreePath] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -38,6 +49,18 @@ export default function PlanPage({
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  useEffect(() => {
+    fetch("/api/status")
+      .then((r) => r.json())
+      .then((d) => {
+        const wt = d.active?.find(
+          (w: { branch: string }) => w.branch === decodedBranch,
+        );
+        if (wt) setWorktreePath(wt.path);
+      })
+      .catch(() => {});
+  }, [decodedBranch]);
 
   const files: PlanFile[] = data && data.type !== "empty" ? data.files : [];
   const currentFile = files.find((f) => f.name === selectedFile);
@@ -84,9 +107,10 @@ export default function PlanPage({
         <div className="flex flex-col items-center justify-center rounded-lg border border-gray-800 bg-gray-900/50 p-16">
           <p className="text-gray-500 mb-4">플랜이 없습니다</p>
           <button
-            disabled
-            className="rounded-lg px-4 py-2 text-sm font-medium bg-purple-900/50 text-purple-400 opacity-50 cursor-not-allowed"
-            title="터미널 연동 후 사용 가능"
+            onClick={() => setShowTerminal(true)}
+            disabled={!worktreePath}
+            className="rounded-lg px-4 py-2 text-sm font-medium bg-purple-600 text-white hover:bg-purple-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            title={worktreePath ? "Claude Code로 플랜 생성" : "워크트리를 찾을 수 없습니다"}
           >
             AI로 플랜 만들기
           </button>
@@ -97,6 +121,7 @@ export default function PlanPage({
           plan={data.plan}
           files={data.files}
           onRefresh={fetchData}
+          onOpenAI={worktreePath ? () => setShowTerminal(true) : undefined}
         />
       ) : (
         /* Raw file view */
@@ -155,6 +180,18 @@ export default function PlanPage({
             )}
           </div>
         </div>
+      )}
+
+      {showTerminal && worktreePath && (
+        <TerminalDialog
+          title={`Plan: ${decodedBranch}`}
+          cwd={worktreePath}
+          initialCommand={`claude "이 프로젝트의 개발 플랜을 작성해주세요. .claude/plan/ 디렉토리에 plan.json과 스텝별 .md 파일로 작성하세요. plan.json 형식: {\\\"title\\\": \\\"플랜 제목\\\", \\\"steps\\\": [{\\\"id\\\": \\\"01\\\", \\\"title\\\": \\\"스텝 제목\\\", \\\"file\\\": \\\"01-name.md\\\", \\\"status\\\": \\\"pending\\\"}]}. 각 스텝은 별도 md 파일로 상세 명세를 작성하세요."`}
+          onClose={() => {
+            setShowTerminal(false);
+            fetchData();
+          }}
+        />
       )}
     </div>
   );

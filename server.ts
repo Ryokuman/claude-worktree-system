@@ -104,6 +104,7 @@ app.prepare().then(async () => {
     const { env } = await import("./src/lib/env");
     const { classifyBranches } = await import("./src/lib/classifier");
     const { readJson, writeJson } = await import("./src/lib/store");
+    const { startPlanSync } = await import("./src/lib/plan-sync");
 
     // --- Git watcher (inline of initWatcher) ---
     const refsPath = path.join(env.MAIN_REPO_PATH, ".git", "refs");
@@ -153,5 +154,8 @@ app.prepare().then(async () => {
         }
       }
     }, env.HEALTHCHECK_INTERVAL);
+
+    // --- Plan sync (bidirectional) ---
+    startPlanSync(() => readJson("active.json") as any[]);
   });
 });
