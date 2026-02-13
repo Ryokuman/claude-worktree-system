@@ -19,14 +19,15 @@ import type { ActiveWorktree } from "@/lib/types";
  */
 export async function POST(
   _request: Request,
-  { params }: { params: Promise<{ taskNo: string }> }
+  { params }: { params: Promise<{ taskNo: string }> },
 ) {
   try {
     const { taskNo } = await params;
     const active = readJson<ActiveWorktree>("active.json");
     const worktree = active.find((w) => w.taskNo === taskNo);
     if (!worktree) throw new Error(`Worktree ${taskNo} not found`);
-    if (worktree.status === "running") throw new Error(`${taskNo} is already running`);
+    if (worktree.status === "running")
+      throw new Error(`${taskNo} is already running`);
 
     // Assign port if not yet assigned
     if (!worktree.port) {
@@ -54,7 +55,9 @@ export async function POST(
     worktree.pid = child.pid || null;
     writeJson("active.json", active);
 
-    console.log(`[process] Started dev server for ${taskNo} on port ${worktree.port} (PID: ${child.pid})`);
+    console.log(
+      `[process] Started dev server for ${taskNo} on port ${worktree.port} (PID: ${child.pid})`,
+    );
     return NextResponse.json({ status: "started", taskNo });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Unknown error";

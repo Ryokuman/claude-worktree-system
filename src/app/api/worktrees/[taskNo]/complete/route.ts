@@ -23,14 +23,17 @@ const PLAN_DIR = path.resolve(process.cwd(), "plan");
  */
 export async function POST(
   _request: Request,
-  { params }: { params: Promise<{ taskNo: string }> }
+  { params }: { params: Promise<{ taskNo: string }> },
 ) {
   try {
     const { taskNo } = await params;
     const active = readJson<ActiveWorktree>("active.json");
     const idx = active.findIndex((w) => w.taskNo === taskNo);
     if (idx === -1) {
-      return NextResponse.json({ error: "Worktree not found" }, { status: 404 });
+      return NextResponse.json(
+        { error: "Worktree not found" },
+        { status: 404 },
+      );
     }
     const worktree = active[idx];
 

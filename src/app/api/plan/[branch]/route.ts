@@ -16,7 +16,7 @@ const PLAN_DIR = path.resolve(process.cwd(), "plan");
  */
 export async function GET(
   _request: Request,
-  { params }: { params: Promise<{ branch: string }> }
+  { params }: { params: Promise<{ branch: string }> },
 ) {
   const { branch } = await params;
   const decodedBranch = decodeURIComponent(branch);
@@ -38,7 +38,7 @@ export async function GET(
  */
 export async function PUT(
   request: Request,
-  { params }: { params: Promise<{ branch: string }> }
+  { params }: { params: Promise<{ branch: string }> },
 ) {
   try {
     const { branch } = await params;
@@ -48,7 +48,7 @@ export async function PUT(
     if (!filename || content === undefined) {
       return NextResponse.json(
         { error: "filename and content are required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 

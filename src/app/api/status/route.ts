@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
 import { readJson } from "@/lib/store";
 import { listPlanFiles } from "@/lib/plan-manager";
-import type { ActiveWorktree, DeactiveBranch, EndedWorktree } from "@/lib/types";
+import type {
+  ActiveWorktree,
+  DeactiveBranch,
+  EndedWorktree,
+} from "@/lib/types";
 
 /**
  * GET /api/status

@@ -14,7 +14,7 @@ import { stopDevServer } from "@/lib/process-manager";
  */
 export async function POST(
   _request: Request,
-  { params }: { params: Promise<{ taskNo: string }> }
+  { params }: { params: Promise<{ taskNo: string }> },
 ) {
   try {
     const { taskNo } = await params;
