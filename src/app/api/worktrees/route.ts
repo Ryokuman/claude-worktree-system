@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server";
+import { execSync } from "child_process";
+import fs from "fs";
+import path from "path";
 import { getActive, getDeactive, setDeactive, addActive } from "@/lib/store";
-import { addWorktree } from "@/lib/git";
 import { extractTaskNo, branchToTaskName } from "@/lib/task-utils";
 import { findAvailablePort } from "@/lib/port-manager";
-import { copyPlanToWorktree } from "@/lib/plan-manager";
 import { env } from "@/lib/env";
-import path from "path";
-import fs from "fs";
+
+const PLAN_DIR = path.resolve(process.cwd(), "plan");
 
 /**
  * GET /api/worktrees
@@ -56,11 +57,22 @@ export async function POST(request: Request) {
 
     // Create git worktree if path doesn't exist
     if (!fs.existsSync(worktreePath)) {
-      addWorktree(branch, worktreePath);
+      execSync(`git worktree add "${worktreePath}" "${branch}"`, {
+        cwd: env.MAIN_REPO_PATH,
+        encoding: "utf-8",
+      });
     }
 
     // Copy plan files to worktree
-    copyPlanToWorktree(branch, worktreePath);
+    const planDir = path.join(PLAN_DIR, "active", branch);
+    if (fs.existsSync(planDir)) {
+      const targetDir = path.join(worktreePath, "plan");
+      if (!fs.existsSync(targetDir)) fs.mkdirSync(targetDir, { recursive: true });
+      const planFiles = fs.readdirSync(planDir).filter((f) => !f.startsWith("."));
+      for (const file of planFiles) {
+        fs.copyFileSync(path.join(planDir, file), path.join(targetDir, file));
+      }
+    }
 
     // Remove from deactive
     const deactive = getDeactive().filter((d) => d.branch !== branch);

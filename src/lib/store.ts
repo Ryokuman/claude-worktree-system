@@ -42,15 +42,6 @@ export function addActive(worktree: ActiveWorktree) {
   setActive(list);
 }
 
-export function removeActive(taskNo: string): ActiveWorktree | undefined {
-  const list = getActive();
-  const idx = list.findIndex((w) => w.taskNo === taskNo);
-  if (idx === -1) return undefined;
-  const [removed] = list.splice(idx, 1);
-  setActive(list);
-  return removed;
-}
-
 export function updateActive(taskNo: string, updates: Partial<ActiveWorktree>) {
   const list = getActive();
   const worktree = list.find((w) => w.taskNo === taskNo);
@@ -71,8 +62,5 @@ export const setDeactive = (data: DeactiveBranch[]) =>
 
 export const getEnded = () => readJson<EndedWorktree>("ended.json");
 
-export function addEnded(item: EndedWorktree) {
-  const list = getEnded();
-  list.push(item);
-  writeJson("ended.json", list);
-}
+export const setEnded = (data: EndedWorktree[]) =>
+  writeJson("ended.json", data);

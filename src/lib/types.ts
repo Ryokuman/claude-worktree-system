@@ -30,10 +30,3 @@ export interface PlanFile {
   content: string;
   updatedAt: string;
 }
-
-export interface TerminalSession {
-  id: string;
-  pid: number;
-  cwd: string;
-  createdAt: string;
-}

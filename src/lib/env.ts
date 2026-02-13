@@ -13,12 +13,3 @@ export const env = {
   ),
   HEALTHCHECK_PATH: process.env.HEALTHCHECK_PATH || "/api/healthz",
 } as const;
-
-export function validateEnv(): void {
-  if (!env.MAIN_REPO_PATH) {
-    throw new Error("MAIN_REPO_PATH is required in .env");
-  }
-  if (!env.WORKTREE_BASE_DIR) {
-    throw new Error("WORKTREE_BASE_DIR is required in .env");
-  }
-}

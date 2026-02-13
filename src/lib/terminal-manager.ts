@@ -1,6 +1,12 @@
 import * as pty from "node-pty";
 import { randomUUID } from "crypto";
-import type { TerminalSession } from "./types";
+
+interface TerminalSession {
+  id: string;
+  pid: number;
+  cwd: string;
+  createdAt: string;
+}
 
 interface PtySession {
   id: string;

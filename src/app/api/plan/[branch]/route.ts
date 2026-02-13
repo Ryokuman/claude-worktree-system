@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
-import { listPlanFiles, writePlanFile } from "@/lib/plan-manager";
+import fs from "fs";
+import path from "path";
+import { listPlanFiles } from "@/lib/plan-manager";
+
+const PLAN_DIR = path.resolve(process.cwd(), "plan");
 
 /**
  * GET /api/plan/:branch
@@ -48,7 +52,10 @@ export async function PUT(
       );
     }
 
-    writePlanFile(decodedBranch, filename, content);
+    const dir = path.join(PLAN_DIR, "active", decodedBranch);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, filename), content, "utf-8");
+
     return NextResponse.json({ status: "updated", filename });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Unknown error";

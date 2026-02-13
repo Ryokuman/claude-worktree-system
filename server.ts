@@ -1,7 +1,9 @@
 import { createServer } from "http";
 import { parse } from "url";
+import path from "path";
 import next from "next";
 import { WebSocketServer } from "ws";
+import { watch } from "chokidar";
 
 // Load .env before anything else
 import "./src/lib/env";
@@ -86,11 +88,52 @@ app.prepare().then(async () => {
   server.listen(port, async () => {
     console.log(`> Worktree Handler ready on http://${hostname}:${port}`);
 
-    // Initialize background services
-    const { initWatcher } = await import("./src/lib/watcher");
-    const { startHealthChecker } = await import("./src/lib/health-checker");
+    const { env } = await import("./src/lib/env");
+    const { classifyBranches } = await import("./src/lib/classifier");
+    const { getActive, updateActive } = await import("./src/lib/store");
 
-    initWatcher();
-    startHealthChecker();
+    // --- Git watcher (inline of initWatcher) ---
+    const refsPath = path.join(env.MAIN_REPO_PATH, ".git", "refs");
+    console.log("[watcher] Watching git refs at:", refsPath);
+
+    classifyBranches();
+
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+    const watcher = watch(refsPath, {
+      persistent: true,
+      ignoreInitial: true,
+      depth: 5,
+    });
+    watcher.on("all", () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        console.log("[watcher] Git change detected, classifying branches...");
+        classifyBranches();
+      }, 2000);
+    });
+    watcher.on("error", (err) => console.error("[watcher] Error:", err));
+
+    // --- Health checker (inline of startHealthChecker) ---
+    console.log(`[health] Starting health checker (interval: ${env.HEALTHCHECK_INTERVAL}ms)`);
+    setInterval(async () => {
+      const running = getActive().filter((w) => w.status === "running");
+      for (const worktree of running) {
+        try {
+          const controller = new AbortController();
+          const timeout = setTimeout(() => controller.abort(), 5000);
+          const res = await fetch(`http://localhost:${worktree.port}${env.HEALTHCHECK_PATH}`, {
+            signal: controller.signal,
+          });
+          clearTimeout(timeout);
+          if (!res.ok) {
+            console.log(`[health] ${worktree.taskNo} unhealthy (status ${res.status})`);
+            updateActive(worktree.taskNo, { status: "stopped", pid: null });
+          }
+        } catch {
+          console.log(`[health] ${worktree.taskNo} unreachable, marking as stopped`);
+          updateActive(worktree.taskNo, { status: "stopped", pid: null });
+        }
+      }
+    }, env.HEALTHCHECK_INTERVAL);
   });
 });

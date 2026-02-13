@@ -1,8 +1,69 @@
-import { listBranches, listWorktrees } from "./git";
+import { execSync } from "child_process";
 import { extractTaskNo, resetTTNCounter, branchToTaskName } from "./task-utils";
 import { getActive, setActive, setDeactive, addActive } from "./store";
 import { env } from "./env";
 import type { DeactiveBranch } from "./types";
+
+interface BranchInfo {
+  name: string;
+  isRemote: boolean;
+  lastCommit: string;
+}
+
+interface WorktreeInfo {
+  path: string;
+  branch: string;
+  head: string;
+}
+
+function listBranches(): BranchInfo[] {
+  const raw = execSync("git branch -a --format='%(refname:short)|%(objectname:short)'", {
+    cwd: env.MAIN_REPO_PATH,
+    encoding: "utf-8",
+  });
+
+  const branches: BranchInfo[] = [];
+  const seen = new Set<string>();
+
+  for (const line of raw.trim().split("\n")) {
+    if (!line) continue;
+    const [fullName, commit] = line.split("|");
+    const isRemote = fullName.startsWith("origin/");
+    const name = isRemote ? fullName.replace("origin/", "") : fullName;
+
+    if (name === "HEAD" || name.includes("HEAD")) continue;
+    if (seen.has(name)) continue;
+    seen.add(name);
+
+    branches.push({ name, isRemote, lastCommit: commit || "" });
+  }
+
+  return branches;
+}
+
+function listWorktrees(): WorktreeInfo[] {
+  const raw = execSync("git worktree list --porcelain", {
+    cwd: env.MAIN_REPO_PATH,
+    encoding: "utf-8",
+  });
+
+  const worktrees: WorktreeInfo[] = [];
+  let current: Partial<WorktreeInfo> = {};
+
+  for (const line of raw.split("\n")) {
+    if (line.startsWith("worktree ")) {
+      if (current.path) worktrees.push(current as WorktreeInfo);
+      current = { path: line.replace("worktree ", "") };
+    } else if (line.startsWith("HEAD ")) {
+      current.head = line.replace("HEAD ", "");
+    } else if (line.startsWith("branch ")) {
+      current.branch = line.replace("branch refs/heads/", "");
+    }
+  }
+  if (current.path) worktrees.push(current as WorktreeInfo);
+
+  return worktrees;
+}
 
 function sortDeactive(list: DeactiveBranch[]): DeactiveBranch[] {
   return list.sort((a, b) => {
@@ -31,7 +92,7 @@ export function classifyBranches(): void {
     const mainRepoPath = env.MAIN_REPO_PATH;
     for (const wt of worktrees) {
       if (!wt.branch) continue;
-      if (wt.path === mainRepoPath) continue; // skip main repo itself
+      if (wt.path === mainRepoPath) continue;
       if (activeBranches.has(wt.branch)) continue;
 
       const taskNo = extractTaskNo(wt.branch);
@@ -42,7 +103,7 @@ export function classifyBranches(): void {
         taskName,
         branch: wt.branch,
         path: wt.path,
-        port: 0, // will be assigned on start
+        port: 0,
         status: "stopped",
         pid: null,
         createdAt: new Date().toISOString().split("T")[0],

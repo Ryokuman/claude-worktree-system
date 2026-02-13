@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
-import { getActive, removeActive, addEnded } from "@/lib/store";
+import fs from "fs";
+import path from "path";
+import { getActive, setActive, getEnded, setEnded } from "@/lib/store";
 import { stopDevServer } from "@/lib/process-manager";
-import { archivePlan } from "@/lib/plan-manager";
+
+const PLAN_DIR = path.resolve(process.cwd(), "plan");
 
 /**
  * POST /api/worktrees/:taskNo/complete
@@ -23,10 +26,12 @@ export async function POST(
 ) {
   try {
     const { taskNo } = await params;
-    const worktree = getActive().find((w) => w.taskNo === taskNo);
-    if (!worktree) {
+    const activeList = getActive();
+    const idx = activeList.findIndex((w) => w.taskNo === taskNo);
+    if (idx === -1) {
       return NextResponse.json({ error: "Worktree not found" }, { status: 404 });
     }
+    const worktree = activeList[idx];
 
     // Stop server if running
     if (worktree.status === "running" && worktree.pid) {
@@ -38,18 +43,30 @@ export async function POST(
     }
 
     // Remove from active
-    removeActive(taskNo);
+    activeList.splice(idx, 1);
+    setActive(activeList);
 
-    // Archive plan
-    archivePlan(worktree.branch);
+    // Archive plan: plan/active/{branch} → plan/ended/{branch}
+    const activeDir = path.join(PLAN_DIR, "active", worktree.branch);
+    const endedDir = path.join(PLAN_DIR, "ended", worktree.branch);
+    if (fs.existsSync(activeDir)) {
+      if (!fs.existsSync(endedDir)) fs.mkdirSync(endedDir, { recursive: true });
+      const files = fs.readdirSync(activeDir).filter((f) => !f.startsWith("."));
+      for (const file of files) {
+        fs.copyFileSync(path.join(activeDir, file), path.join(endedDir, file));
+      }
+      fs.rmSync(activeDir, { recursive: true, force: true });
+    }
 
     // Add to ended
-    addEnded({
+    const endedList = getEnded();
+    endedList.push({
       taskNo: worktree.taskNo,
       taskName: worktree.taskName,
       branch: worktree.branch,
       completedAt: new Date().toISOString().split("T")[0],
     });
+    setEnded(endedList);
 
     return NextResponse.json({ status: "completed", taskNo });
   } catch (err: unknown) {
