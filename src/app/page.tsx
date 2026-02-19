@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import Link from "next/link";
 import { WorktreeCard } from "@/components/dashboard/WorktreeCard";
 import { AddWorktreeDialog } from "@/components/dashboard/AddWorktreeDialog";
@@ -9,9 +9,18 @@ import type { ActiveWorktree, DeactiveBranch } from "@/lib/types";
 export default function DashboardPage() {
   const [active, setActive] = useState<ActiveWorktree[]>([]);
   const [deactive, setDeactive] = useState<DeactiveBranch[]>([]);
+  const [mainBranches, setMainBranches] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+
+  const mainSet = useMemo(() => new Set(mainBranches), [mainBranches]);
+
+  // deactive에서 main branches 제외한 feature 브랜치 수
+  const featureBranchCount = useMemo(
+    () => deactive.filter((d) => !mainSet.has(d.branch)).length,
+    [deactive, mainSet],
+  );
 
   const fetchStatus = useCallback(async () => {
     try {
@@ -20,6 +29,7 @@ export default function DashboardPage() {
       const data = await res.json();
       setActive(data.active);
       setDeactive(data.deactive);
+      setMainBranches(data.mainBranches || []);
       setLoading(false);
     } catch {
       setLoading(false);
@@ -60,8 +70,13 @@ export default function DashboardPage() {
               active <span className="font-mono text-gray-300">{active.length}</span>
             </span>
             <span>
-              branches <span className="font-mono text-gray-300">{deactive.length}</span>
+              branches <span className="font-mono text-gray-300">{featureBranchCount}</span>
             </span>
+            {mainBranches.length > 0 && (
+              <span>
+                main <span className="font-mono text-gray-300">{mainBranches.length}</span>
+              </span>
+            )}
           </div>
         </div>
         <button
@@ -118,6 +133,7 @@ export default function DashboardPage() {
       {showAddDialog && (
         <AddWorktreeDialog
           branches={deactive}
+          mainBranches={mainBranches}
           onAdd={() => {
             setShowAddDialog(false);
             fetchStatus();

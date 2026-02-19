@@ -5,18 +5,22 @@ import type { DeactiveBranch } from "@/lib/types";
 
 interface AddWorktreeDialogProps {
   branches: DeactiveBranch[];
+  mainBranches: string[];
   onAdd: (branch: string) => void;
   onClose: () => void;
 }
 
 export function AddWorktreeDialog({
   branches,
+  mainBranches,
   onAdd,
   onClose,
 }: AddWorktreeDialogProps) {
   const [selected, setSelected] = useState("");
   const [healthCheckPath, setHealthCheckPath] = useState("/");
   const [loading, setLoading] = useState(false);
+
+  const mainSet = new Set(mainBranches);
 
   async function handleCreate() {
     if (!selected) return;
@@ -54,7 +58,7 @@ export function AddWorktreeDialog({
         >
           <option value="">-- Select --</option>
           {branches
-            .filter((b) => !["main", "master", "develop", "dev"].includes(b.branch))
+            .filter((b) => !mainSet.has(b.branch))
             .map((b) => (
               <option key={b.branch} value={b.branch}>
                 {b.taskNo} - {b.branch}

@@ -12,4 +12,12 @@ export const env = {
     10
   ),
   HEALTHCHECK_PATH: process.env.HEALTHCHECK_PATH || "/",
+  MAIN_BRANCHES: (() => {
+    try {
+      const raw = process.env.MAIN_BRANCHES || '[]';
+      return JSON.parse(raw) as string[];
+    } catch {
+      return [];
+    }
+  })(),
 } as const;

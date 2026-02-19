@@ -44,14 +44,21 @@ function listBranches(): BranchInfo[] {
     if (!line) continue;
     const [fullName, commit] = line.split("|");
 
+    // Skip bare remote name (e.g. "dynamos" = remote HEAD ref)
     // Strip remote prefix (dynamos/feat/... → feat/...)
     let name = fullName;
+    let isRemoteRef = false;
     for (const remote of remotes) {
+      if (fullName === remote) {
+        isRemoteRef = true;
+        break;
+      }
       if (fullName.startsWith(remote + "/")) {
         name = fullName.slice(remote.length + 1);
         break;
       }
     }
+    if (isRemoteRef) continue;
 
     if (name === "HEAD" || name.includes("HEAD")) continue;
     if (seen.has(name)) continue;

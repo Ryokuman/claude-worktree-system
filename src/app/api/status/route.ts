@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { readJson } from "@/lib/store";
 import { listPlanFiles } from "@/lib/plan-manager";
+import { env } from "@/lib/env";
 import type {
   ActiveWorktree,
   DeactiveBranch,
@@ -27,5 +28,6 @@ export async function GET() {
     active,
     deactive: readJson<DeactiveBranch>("deactive.json"),
     ended: readJson<EndedWorktree>("ended.json"),
+    mainBranches: env.MAIN_BRANCHES,
   });
 }
