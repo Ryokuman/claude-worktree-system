@@ -26,8 +26,9 @@ function safeFit(fitAddon: FitAddon) {
   }
 }
 
+let sessionCounter = 0;
 function generateId() {
-  return Math.random().toString(36).slice(2) + Date.now().toString(36);
+  return `s${++sessionCounter}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
 export function useTerminal(
@@ -36,11 +37,6 @@ export function useTerminal(
 ): TerminalControls {
   const fitAddonRef = useRef<FitAddon | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
-  const termRef = useRef<Terminal | null>(null);
-  const sessionIdRef = useRef<string>(generateId());
-  const reconnectRef = useRef(0);
-  const disposed = useRef(false);
-  const isFirstConnect = useRef(true);
 
   const refit = useCallback(() => {
     if (fitAddonRef.current) {
@@ -59,10 +55,13 @@ export function useTerminal(
     const container = containerRef.current;
     if (!container) return;
 
-    disposed.current = false;
-    isFirstConnect.current = true;
-    reconnectRef.current = 0;
-    const sessionId = sessionIdRef.current;
+    // Per-effect-run state — not shared across StrictMode re-runs
+    let disposed = false;
+    let currentWs: WebSocket | null = null;
+    let reconnectCount = 0;
+    let isFirstConnect = true;
+    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+    const sessionId = generateId();
 
     const term = new Terminal({
       cursorBlink: true,
@@ -75,7 +74,6 @@ export function useTerminal(
         selectionBackground: "#3b82f680",
       },
     });
-    termRef.current = term;
 
     const fitAddon = new FitAddon();
     fitAddonRef.current = fitAddon;
@@ -87,38 +85,43 @@ export function useTerminal(
     // Resize handling
     const resizeObserver = new ResizeObserver(() => {
       safeFit(fitAddon);
-      const ws = wsRef.current;
-      if (ws && ws.readyState === WebSocket.OPEN) {
-        ws.send(
+      if (currentWs && currentWs.readyState === WebSocket.OPEN) {
+        currentWs.send(
           JSON.stringify({ type: "resize", cols: term.cols, rows: term.rows }),
         );
       }
     });
     resizeObserver.observe(container);
 
+    // User input → WebSocket
+    term.onData((data) => {
+      if (currentWs && currentWs.readyState === WebSocket.OPEN) {
+        currentWs.send(data);
+      }
+    });
+
     function connect() {
-      if (disposed.current) return;
+      if (disposed) return;
 
       const params = new URLSearchParams();
       params.set("sessionId", sessionId);
       if (options.cwd) params.set("cwd", options.cwd);
-      // initialCommand only on first connect
-      if (isFirstConnect.current && options.initialCommand) {
+      if (isFirstConnect && options.initialCommand) {
         params.set("initialCommand", options.initialCommand);
       }
-      isFirstConnect.current = false;
+      isFirstConnect = false;
 
       const protocol =
         window.location.protocol === "https:" ? "wss:" : "ws:";
       const wsUrl = `${protocol}//${window.location.host}/ws/terminal?${params}`;
       const ws = new WebSocket(wsUrl);
+      currentWs = ws;
       wsRef.current = ws;
 
       let gotPtyExit = false;
-      let expectingReplay = false;
 
       ws.onopen = () => {
-        reconnectRef.current = 0;
+        reconnectCount = 0;
         ws.send(
           JSON.stringify({ type: "resize", cols: term.cols, rows: term.rows }),
         );
@@ -130,8 +133,6 @@ export function useTerminal(
           try {
             const msg = JSON.parse(data);
             if (msg.type === "pty:replay") {
-              // Server is about to replay scrollback — clear terminal first
-              expectingReplay = true;
               term.reset();
               return;
             }
@@ -146,20 +147,16 @@ export function useTerminal(
             // Not a control message
           }
         }
-        if (expectingReplay) {
-          expectingReplay = false;
-        }
         term.write(data);
       };
 
       ws.onclose = () => {
-        if (disposed.current || gotPtyExit) return;
-        // Connection lost — auto reconnect (laptop sleep, network drop, etc.)
+        if (disposed || gotPtyExit) return;
         term.write("\r\n\x1b[33m[Connection lost]\x1b[0m");
-        if (reconnectRef.current < MAX_RECONNECT) {
-          reconnectRef.current++;
-          term.write(` \x1b[36m(reconnecting...)\x1b[0m\r\n`);
-          setTimeout(() => connect(), RECONNECT_DELAY);
+        if (reconnectCount < MAX_RECONNECT) {
+          reconnectCount++;
+          term.write(` \x1b[36m(reconnecting ${reconnectCount}/${MAX_RECONNECT}...)\x1b[0m\r\n`);
+          reconnectTimer = setTimeout(() => connect(), RECONNECT_DELAY);
         } else {
           term.write(
             `\r\n\x1b[90m[Reconnect failed — close and reopen terminal]\x1b[0m\r\n`,
@@ -168,32 +165,22 @@ export function useTerminal(
       };
     }
 
-    // User input → WebSocket
-    term.onData((data) => {
-      const ws = wsRef.current;
-      if (ws && ws.readyState === WebSocket.OPEN) {
-        ws.send(data);
-      }
-    });
-
     connect();
 
     return () => {
-      disposed.current = true;
+      disposed = true;
+      if (reconnectTimer) clearTimeout(reconnectTimer);
       cancelAnimationFrame(rafId);
       resizeObserver.disconnect();
       fitAddonRef.current = null;
-      termRef.current = null;
-      // Tell server to kill the PTY
-      const ws = wsRef.current;
-      wsRef.current = null;
-      if (ws && ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({ type: "kill" }));
+      // Tell server to kill PTY session
+      if (currentWs && currentWs.readyState === WebSocket.OPEN) {
+        currentWs.send(JSON.stringify({ type: "kill" }));
       }
-      if (ws) ws.close();
+      if (currentWs) currentWs.close();
+      currentWs = null;
+      wsRef.current = null;
       term.dispose();
-      // Reset for potential remount
-      sessionIdRef.current = generateId();
     };
   }, [containerRef, options.cwd, options.initialCommand]);
 

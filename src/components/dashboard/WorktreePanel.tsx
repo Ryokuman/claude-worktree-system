@@ -21,6 +21,10 @@ const TasksTabView = dynamic(
   () => import("@/components/panel/TasksTabView").then((m) => m.TasksTabView),
   { ssr: false },
 );
+const GitTabView = dynamic(
+  () => import("@/components/panel/GitTabView").then((m) => m.GitTabView),
+  { ssr: false },
+);
 
 interface WorktreePanelProps {
   worktree: ActiveWorktree;
@@ -97,6 +101,17 @@ export function WorktreePanel({
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <button
+            onClick={async () => {
+              await fetch(`/api/worktrees/${worktree.taskNo}/vscode`, {
+                method: "POST",
+              });
+            }}
+            className="text-xs text-gray-500 hover:text-blue-400 transition-colors"
+            title="Open in VSCode"
+          >
+            code
+          </button>
+          <button
             onClick={() => setShowEnv(true)}
             className="text-xs text-gray-500 hover:text-blue-400 transition-colors"
           >
@@ -149,6 +164,14 @@ export function WorktreePanel({
           style={{ display: activeTab === "tasks" ? "block" : "none" }}
         >
           <TasksTabView branch={worktree.branch} />
+        </div>
+
+        {/* Git Tab */}
+        <div
+          className="absolute inset-0"
+          style={{ display: activeTab === "git" ? "flex" : "none" }}
+        >
+          <GitTabView branch={worktree.branch} />
         </div>
       </div>
 

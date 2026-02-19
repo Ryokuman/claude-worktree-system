@@ -57,4 +57,59 @@ export interface TerminalSession {
   createdAt: number;
 }
 
-export type PanelTab = "plan" | "terminal" | "tasks";
+export type PanelTab = "plan" | "terminal" | "tasks" | "git";
+
+export interface GitCommitRaw {
+  hash: string;
+  parents: string[];
+  shortHash: string;
+  author: string;
+  relativeDate: string;
+  message: string;
+  refs: string;
+}
+
+/** Computed per-row graph layout for SVG rendering */
+export interface GraphRow {
+  /** Column index of this commit's node */
+  col: number;
+  /** Total columns at this row */
+  totalCols: number;
+  /** Vertical pass-through lanes (column indices) */
+  passThrough: number[];
+  /** Lines from parent columns merging into this node: [fromCol, toCol] */
+  mergeLines: [number, number][];
+  /** Lines branching from this node to child columns: [fromCol, toCol] */
+  branchLines: [number, number][];
+}
+
+export interface GitFileChange {
+  status: string;
+  file: string;
+}
+
+export interface GitCommitDetail {
+  hash: string;
+  author: string;
+  date: string;
+  message: string;
+  files: GitFileChange[];
+  diff: string;
+}
+
+/** WIP (uncommitted changes) */
+export interface WipFile {
+  file: string;
+  status: string; // "M", "A", "D", "??"
+}
+
+export interface WipData {
+  staged: WipFile[];
+  unstaged: WipFile[];
+}
+
+/** Per-file diff response */
+export interface FileDiffData {
+  file: string;
+  diff: string;
+}

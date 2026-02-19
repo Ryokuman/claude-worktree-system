@@ -11,6 +11,7 @@ const TABS: { key: PanelTab; label: string }[] = [
   { key: "plan", label: "Plan" },
   { key: "terminal", label: "Terminal" },
   { key: "tasks", label: "Tasks" },
+  { key: "git", label: "Git" },
 ];
 
 export function PanelTabBar({ activeTab, onTabChange }: PanelTabBarProps) {
