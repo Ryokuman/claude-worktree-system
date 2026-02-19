@@ -6,6 +6,12 @@ import { readJson, writeJson } from "@/lib/store";
 import { extractTaskNo, branchToTaskName } from "@/lib/task-utils";
 import { findAvailablePort } from "@/lib/port-manager";
 import { env } from "@/lib/env";
+import {
+  readMainRepoEnv,
+  readEnvTemplate,
+  generateEnv,
+  writeWorktreeEnv,
+} from "@/lib/env-generator";
 import type { ActiveWorktree, DeactiveBranch } from "@/lib/types";
 
 const PLAN_DIR = path.resolve(process.cwd(), "plan");
@@ -84,6 +90,20 @@ export async function POST(request: Request) {
       for (const file of planFiles) {
         fs.copyFileSync(path.join(planDir, file), path.join(targetDir, file));
       }
+    }
+
+    // Auto-generate .env for worktree
+    const mainEnv = readMainRepoEnv();
+    if (mainEnv) {
+      const template = readEnvTemplate();
+      const vars = {
+        PORT: String(port),
+        BRANCH: branch,
+        TASK_NO: taskNo,
+        WORKTREE_PATH: worktreePath,
+      };
+      const entries = generateEnv(mainEnv.entries, template.overrides, vars);
+      writeWorktreeEnv(worktreePath, entries);
     }
 
     // Remove from deactive
