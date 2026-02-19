@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import type { ActiveWorktree } from "@/lib/types";
+import { EnvEditorDialog } from "./EnvEditorDialog";
 
 interface WorktreeCardProps {
   worktree: ActiveWorktree;
@@ -11,6 +12,7 @@ interface WorktreeCardProps {
 
 export function WorktreeCard({ worktree, onRefresh }: WorktreeCardProps) {
   const [loading, setLoading] = useState(false);
+  const [showEnv, setShowEnv] = useState(false);
 
   async function handleStart() {
     setLoading(true);
@@ -75,6 +77,14 @@ export function WorktreeCard({ worktree, onRefresh }: WorktreeCardProps) {
       </div>
 
       <div className="flex items-center gap-3 shrink-0">
+        <button
+          onClick={() => setShowEnv(true)}
+          className="text-xs text-gray-500 hover:text-gray-300 transition-colors"
+          title="Edit .env"
+        >
+          env
+        </button>
+
         {worktree.hasPlan ? (
           <Link
             href={`/plan/${encodeURIComponent(worktree.branch)}`}
@@ -133,6 +143,13 @@ export function WorktreeCard({ worktree, onRefresh }: WorktreeCardProps) {
           </button>
         </div>
       </div>
+    {showEnv && (
+      <EnvEditorDialog
+        taskNo={worktree.taskNo}
+        taskName={worktree.taskName}
+        onClose={() => setShowEnv(false)}
+      />
+    )}
     </div>
   );
 }
