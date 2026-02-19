@@ -7,13 +7,18 @@ interface EnvEntry {
   value: string;
 }
 
+interface EnvTemplate {
+  source: string;
+  overrides: Record<string, string>;
+}
+
 interface EnvEditorDialogProps {
   taskNo: string;
   taskName: string;
   onClose: () => void;
 }
 
-type EditMode = "structured" | "raw";
+type EditMode = "structured" | "raw" | "template";
 
 export function EnvEditorDialog({
   taskNo,
@@ -27,6 +32,12 @@ export function EnvEditorDialog({
   const [saving, setSaving] = useState(false);
   const [exists, setExists] = useState(false);
   const [dirty, setDirty] = useState(false);
+
+  // Template state
+  const [tplKeys, setTplKeys] = useState<EnvEntry[]>([]);
+  const [tplOverrides, setTplOverrides] = useState<Record<string, string>>({});
+  const [tplLoading, setTplLoading] = useState(false);
+  const [tplDirty, setTplDirty] = useState(false);
 
   // Sync between modes
   function toRaw(e: EnvEntry[]): string {
@@ -54,6 +65,9 @@ export function EnvEditorDialog({
     } else if (mode === "raw" && next === "structured") {
       setEntries(toEntries(raw));
     }
+    if (next === "template" && tplKeys.length === 0) {
+      fetchTemplate();
+    }
     setMode(next);
   }
 
@@ -76,6 +90,24 @@ export function EnvEditorDialog({
   useEffect(() => {
     fetchEnv();
   }, [fetchEnv]);
+
+  // Template fetch
+  async function fetchTemplate() {
+    setTplLoading(true);
+    try {
+      const res = await fetch("/api/env/template");
+      const data = await res.json();
+      if (data.mainEnv) {
+        setTplKeys(data.mainEnv.entries);
+      }
+      if (data.template) {
+        setTplOverrides(data.template.overrides || {});
+      }
+      setTplDirty(false);
+    } finally {
+      setTplLoading(false);
+    }
+  }
 
   // Structured mode handlers
   function updateEntry(index: number, field: "key" | "value", val: string) {
@@ -100,6 +132,20 @@ export function EnvEditorDialog({
     setDirty(true);
   }
 
+  // Template mode handlers
+  function updateOverride(key: string, val: string) {
+    setTplOverrides((prev) => {
+      const next = { ...prev };
+      if (val) {
+        next[key] = val;
+      } else {
+        delete next[key];
+      }
+      return next;
+    });
+    setTplDirty(true);
+  }
+
   // Load from main repo
   async function handleLoadFromMain() {
     const res = await fetch("/api/env/template");
@@ -111,14 +157,12 @@ export function EnvEditorDialog({
     const mainEntries: EnvEntry[] = data.mainEnv.entries;
 
     if (entries.length === 0) {
-      // No existing env — just replace
       setEntries(mainEntries);
       setRaw(toRaw(mainEntries));
       setDirty(true);
       return;
     }
 
-    // Merge: add missing keys, keep existing values
     const existingKeys = new Set(entries.map((e) => e.key));
     const merged = [
       ...entries,
@@ -133,33 +177,48 @@ export function EnvEditorDialog({
   async function handleSave() {
     setSaving(true);
     try {
-      const saveEntries =
-        mode === "structured"
-          ? entries.filter((e) => e.key.trim())
-          : toEntries(raw);
-
-      const res = await fetch(`/api/worktrees/${taskNo}/env`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ entries: saveEntries }),
-      });
-      if (!res.ok) {
-        const data = await res.json();
-        alert(data.error || "Failed to save");
-        return;
-      }
-      setExists(true);
-      setDirty(false);
-      // Re-sync both representations
-      if (mode === "structured") {
-        setRaw(toRaw(saveEntries));
+      if (mode === "template") {
+        const res = await fetch("/api/env/template", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ source: ".env", overrides: tplOverrides }),
+        });
+        if (!res.ok) {
+          alert("Failed to save template");
+          return;
+        }
+        setTplDirty(false);
       } else {
-        setEntries(saveEntries);
+        const saveEntries =
+          mode === "structured"
+            ? entries.filter((e) => e.key.trim())
+            : toEntries(raw);
+
+        const res = await fetch(`/api/worktrees/${taskNo}/env`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ entries: saveEntries }),
+        });
+        if (!res.ok) {
+          const data = await res.json();
+          alert(data.error || "Failed to save");
+          return;
+        }
+        setExists(true);
+        setDirty(false);
+        if (mode === "structured") {
+          setRaw(toRaw(saveEntries));
+        } else {
+          setEntries(saveEntries);
+        }
       }
     } finally {
       setSaving(false);
     }
   }
+
+  const isDirty = mode === "template" ? tplDirty : dirty;
+  const isLoading = mode === "template" ? tplLoading : loading;
 
   return (
     <div
@@ -177,41 +236,34 @@ export function EnvEditorDialog({
               <span className="text-gray-400 mx-2">/</span>
               <span className="text-gray-300">.env</span>
             </h2>
-            {!exists && !loading && (
+            {!exists && !loading && mode !== "template" && (
               <span className="text-xs text-yellow-500">.env not found</span>
             )}
-            {dirty && (
+            {isDirty && (
               <span className="text-xs text-orange-400">unsaved</span>
             )}
           </div>
 
           {/* Mode toggle */}
           <div className="flex items-center gap-1 bg-gray-800 rounded-lg p-0.5">
-            <button
-              onClick={() => switchMode("structured")}
-              className={`px-3 py-1 text-xs rounded-md transition-colors ${
-                mode === "structured"
-                  ? "bg-gray-700 text-gray-200"
-                  : "text-gray-500 hover:text-gray-300"
-              }`}
-            >
-              Table
-            </button>
-            <button
-              onClick={() => switchMode("raw")}
-              className={`px-3 py-1 text-xs rounded-md transition-colors ${
-                mode === "raw"
-                  ? "bg-gray-700 text-gray-200"
-                  : "text-gray-500 hover:text-gray-300"
-              }`}
-            >
-              Raw
-            </button>
+            {(["structured", "raw", "template"] as const).map((m) => (
+              <button
+                key={m}
+                onClick={() => switchMode(m)}
+                className={`px-3 py-1 text-xs rounded-md transition-colors ${
+                  mode === m
+                    ? "bg-gray-700 text-gray-200"
+                    : "text-gray-500 hover:text-gray-300"
+                }`}
+              >
+                {m === "structured" ? "Table" : m === "raw" ? "Raw" : "Template"}
+              </button>
+            ))}
           </div>
         </div>
 
         {/* Body */}
-        {loading ? (
+        {isLoading ? (
           <div className="flex-1 flex items-center justify-center text-gray-500 text-sm py-16">
             Loading...
           </div>
@@ -249,7 +301,7 @@ export function EnvEditorDialog({
               + Add variable
             </button>
           </div>
-        ) : (
+        ) : mode === "raw" ? (
           <textarea
             value={raw}
             onChange={(e) => handleRawChange(e.target.value)}
@@ -257,17 +309,70 @@ export function EnvEditorDialog({
             className="flex-1 min-h-[300px] w-full rounded-lg border border-gray-700 bg-gray-800 px-4 py-3 font-mono text-sm text-gray-200 focus:outline-none focus:border-blue-500 resize-none"
             placeholder="KEY=value"
           />
+        ) : (
+          /* Template mode */
+          <div className="flex-1 overflow-y-auto min-h-[300px] space-y-1">
+            <p className="text-xs text-gray-500 mb-3">
+              새 워크트리 생성 시 자동 적용됩니다. 비워두면 메인 레포 값 그대로 사용.
+              <br />
+              <span className="text-gray-400">
+                사용 가능: {`{{PORT}}`} {`{{BRANCH}}`} {`{{TASK_NO}}`}
+              </span>
+            </p>
+            {tplKeys.map((entry) => (
+              <div key={entry.key} className="flex items-center gap-2">
+                <span className="w-[35%] shrink-0 px-2.5 py-1.5 font-mono text-xs text-gray-400 truncate" title={entry.key}>
+                  {entry.key}
+                </span>
+                <div className="flex-1 relative">
+                  <input
+                    value={tplOverrides[entry.key] ?? ""}
+                    onChange={(e) => updateOverride(entry.key, e.target.value)}
+                    spellCheck={false}
+                    placeholder={entry.value}
+                    className={`w-full rounded border px-2.5 py-1.5 font-mono text-xs focus:outline-none focus:border-blue-500 ${
+                      tplOverrides[entry.key]
+                        ? "border-blue-800 bg-blue-950/30 text-blue-300"
+                        : "border-gray-700 bg-gray-800 text-gray-500"
+                    }`}
+                  />
+                </div>
+                {!tplOverrides[entry.key]?.includes("{{PORT}}") && (
+                  <button
+                    onClick={() =>
+                      updateOverride(entry.key, tplOverrides[entry.key]
+                        ? tplOverrides[entry.key] + "{{PORT}}"
+                        : "{{PORT}}")
+                    }
+                    className="shrink-0 rounded px-1.5 py-1 text-[10px] text-gray-600 hover:text-blue-400 hover:bg-blue-900/20 transition-colors border border-gray-700 hover:border-blue-800"
+                    title="Insert {{PORT}}"
+                  >
+                    +PORT
+                  </button>
+                )}
+              </div>
+            ))}
+            {tplKeys.length === 0 && (
+              <div className="text-center text-gray-500 text-sm py-8">
+                메인 레포에 .env 파일이 없습니다.
+              </div>
+            )}
+          </div>
         )}
 
         {/* Footer */}
         <div className="flex items-center justify-between mt-4">
-          <button
-            onClick={handleLoadFromMain}
-            disabled={loading}
-            className="rounded-lg px-3 py-2 text-xs text-gray-400 hover:text-gray-200 border border-gray-700 hover:border-gray-500 disabled:opacity-50 transition-colors"
-          >
-            Load from main repo
-          </button>
+          {mode !== "template" ? (
+            <button
+              onClick={handleLoadFromMain}
+              disabled={isLoading}
+              className="rounded-lg px-3 py-2 text-xs text-gray-400 hover:text-gray-200 border border-gray-700 hover:border-gray-500 disabled:opacity-50 transition-colors"
+            >
+              Load from main repo
+            </button>
+          ) : (
+            <span className="text-xs text-gray-600">전역 설정 (모든 워크트리에 적용)</span>
+          )}
 
           <div className="flex gap-2">
             <button
@@ -278,7 +383,7 @@ export function EnvEditorDialog({
             </button>
             <button
               onClick={handleSave}
-              disabled={saving || loading || !dirty}
+              disabled={saving || isLoading || !isDirty}
               className="rounded-lg px-4 py-2 text-sm font-medium bg-blue-600 text-white hover:bg-blue-500 disabled:opacity-50 transition-colors"
             >
               {saving ? "Saving..." : "Save"}
