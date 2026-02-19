@@ -16,11 +16,11 @@ export default function DashboardPage() {
 
   const mainSet = useMemo(() => new Set(mainBranches), [mainBranches]);
 
-  // deactive에서 main branches 제외한 feature 브랜치 수
-  const featureBranchCount = useMemo(
+  const deactiveCount = useMemo(
     () => deactive.filter((d) => !mainSet.has(d.branch)).length,
     [deactive, mainSet],
   );
+  const totalBranches = active.length + deactiveCount;
 
   const fetchStatus = useCallback(async () => {
     try {
@@ -66,11 +66,12 @@ export default function DashboardPage() {
         <div className="flex items-center gap-4">
           <h1 className="text-2xl font-bold text-gray-100">Worktree Handler</h1>
           <div className="flex items-center gap-3 text-xs text-gray-500">
-            <span>
-              active <span className="font-mono text-gray-300">{active.length}</span>
-            </span>
-            <span>
-              branches <span className="font-mono text-gray-300">{featureBranchCount}</span>
+            <span className="relative group cursor-default">
+              branch <span className="font-mono text-gray-300">{totalBranches}</span>
+              <span className="absolute left-0 top-full mt-1 hidden group-hover:flex items-center gap-2 whitespace-nowrap rounded bg-gray-800 border border-gray-700 px-2.5 py-1.5 text-xs shadow-lg z-10">
+                <span className="text-green-400">active <span className="font-mono">{active.length}</span></span>
+                <span className="text-red-400">deactivated <span className="font-mono">{deactiveCount}</span></span>
+              </span>
             </span>
             {mainBranches.length > 0 && (
               <span>
