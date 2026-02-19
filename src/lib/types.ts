@@ -50,3 +50,11 @@ export type PlanResponse =
   | { type: "structured"; plan: PlanJson; files: PlanFile[] }
   | { type: "raw"; files: PlanFile[] }
   | { type: "empty" };
+
+export interface TerminalSession {
+  id: string;
+  name: string;
+  createdAt: number;
+}
+
+export type PanelTab = "plan" | "terminal" | "tasks";

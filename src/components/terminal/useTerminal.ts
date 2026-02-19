@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef, useCallback } from "react";
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import "@xterm/xterm/css/xterm.css";
@@ -8,6 +8,11 @@ import "@xterm/xterm/css/xterm.css";
 export interface TerminalOptions {
   cwd?: string;
   initialCommand?: string;
+}
+
+export interface TerminalControls {
+  refit: () => void;
+  sendData: (data: string) => void;
 }
 
 function safeFit(fitAddon: FitAddon) {
@@ -21,7 +26,33 @@ function safeFit(fitAddon: FitAddon) {
 export function useTerminal(
   containerRef: React.RefObject<HTMLDivElement | null>,
   options: TerminalOptions = {},
-) {
+): TerminalControls {
+  const fitAddonRef = useRef<FitAddon | null>(null);
+  const wsRef = useRef<WebSocket | null>(null);
+
+  const refit = useCallback(() => {
+    if (fitAddonRef.current) {
+      safeFit(fitAddonRef.current);
+      // Also notify server of new size
+      const ws = wsRef.current;
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        // Need terminal cols/rows — stored alongside fitAddon
+        const termEl = containerRef.current?.querySelector(".xterm-screen");
+        if (termEl) {
+          // Trigger resize via fitAddon which updates terminal dimensions
+          safeFit(fitAddonRef.current);
+        }
+      }
+    }
+  }, [containerRef]);
+
+  const sendData = useCallback((data: string) => {
+    const ws = wsRef.current;
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(data);
+    }
+  }, []);
+
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
@@ -39,6 +70,7 @@ export function useTerminal(
     });
 
     const fitAddon = new FitAddon();
+    fitAddonRef.current = fitAddon;
     term.loadAddon(fitAddon);
     term.open(container);
 
@@ -55,6 +87,7 @@ export function useTerminal(
       window.location.protocol === "https:" ? "wss:" : "ws:";
     const wsUrl = `${protocol}//${window.location.host}/ws/terminal${query ? `?${query}` : ""}`;
     const ws = new WebSocket(wsUrl);
+    wsRef.current = ws;
 
     ws.onopen = () => {
       ws.send(
@@ -80,8 +113,7 @@ export function useTerminal(
       }
     });
 
-    // Resize handling — ResizeObserver fires immediately on observe(),
-    // so safeFit protects against renderer not being ready yet
+    // Resize handling
     const resizeObserver = new ResizeObserver(() => {
       safeFit(fitAddon);
       if (ws.readyState === WebSocket.OPEN) {
@@ -99,8 +131,12 @@ export function useTerminal(
     return () => {
       cancelAnimationFrame(rafId);
       resizeObserver.disconnect();
+      fitAddonRef.current = null;
+      wsRef.current = null;
       ws.close();
       term.dispose();
     };
   }, [containerRef, options.cwd, options.initialCommand]);
+
+  return { refit, sendData };
 }
