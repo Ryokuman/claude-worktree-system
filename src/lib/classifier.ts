@@ -152,7 +152,6 @@ export function classifyBranches(): void {
     const deactive: DeactiveBranch[] = [];
 
     for (const branch of branches) {
-      if (["main", "master", "develop"].includes(branch.name)) continue;
       if (worktreeBranches.has(branch.name)) continue;
 
       deactive.push({
