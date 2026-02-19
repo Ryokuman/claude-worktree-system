@@ -25,14 +25,14 @@ export function TerminalModal({
   onClose,
 }: TerminalModalProps) {
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-black/90">
-      <div className="flex items-center justify-between px-4 py-2 bg-gray-900 border-b border-gray-800">
+    <div className="fixed inset-0 z-50 flex flex-col bg-black/80 backdrop-blur-md">
+      <div className="flex items-center justify-between px-4 py-2 glass-modal border-b border-white/10">
         <span className="text-sm text-gray-300 font-mono">
           Terminal - {title}
         </span>
         <button
           onClick={onClose}
-          className="rounded px-3 py-1 text-xs font-medium bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-gray-200 transition-colors"
+          className="glass-button rounded px-3 py-1 text-xs font-medium text-gray-300 hover:text-gray-100"
         >
           {closeLabel}
         </button>

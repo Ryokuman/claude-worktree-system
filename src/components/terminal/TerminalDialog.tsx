@@ -24,19 +24,19 @@ export function TerminalDialog({
 }: TerminalDialogProps) {
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+      className="backdrop-glass fixed inset-0 z-50 flex items-center justify-center"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="flex flex-col w-[80vw] h-[70vh] rounded-lg border border-gray-700 bg-gray-950 shadow-2xl overflow-hidden">
-        <div className="flex items-center justify-between px-4 py-2 bg-gray-900 border-b border-gray-800">
+      <div className="glass-modal flex flex-col w-[80vw] h-[70vh] rounded-lg shadow-2xl overflow-hidden">
+        <div className="flex items-center justify-between px-4 py-2 bg-black/20 border-b border-white/10 backdrop-blur-sm">
           <span className="text-sm text-gray-300 font-mono truncate">
             {title}
           </span>
           <button
             onClick={onClose}
-            className="ml-4 rounded px-3 py-1 text-xs font-medium bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-gray-200 transition-colors"
+            className="glass-button ml-4 rounded px-3 py-1 text-xs font-medium text-gray-300 hover:text-gray-100"
           >
             Close
           </button>

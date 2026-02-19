@@ -222,12 +222,12 @@ export function EnvEditorDialog({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+      className="backdrop-glass fixed inset-0 z-50 flex items-center justify-center"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="w-full max-w-2xl rounded-xl border border-gray-700 bg-gray-900 p-6 shadow-2xl flex flex-col max-h-[80vh]">
+      <div className="glass-modal w-full max-w-2xl rounded-xl p-6 shadow-2xl flex flex-col max-h-[80vh]">
         {/* Header */}
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
@@ -245,14 +245,14 @@ export function EnvEditorDialog({
           </div>
 
           {/* Mode toggle */}
-          <div className="flex items-center gap-1 bg-gray-800 rounded-lg p-0.5">
+          <div className="flex items-center gap-1 glass-card rounded-lg p-0.5">
             {(["structured", "raw", "template"] as const).map((m) => (
               <button
                 key={m}
                 onClick={() => switchMode(m)}
                 className={`px-3 py-1 text-xs rounded-md transition-colors ${
                   mode === m
-                    ? "bg-gray-700 text-gray-200"
+                    ? "bg-white/10 text-gray-100"
                     : "text-gray-500 hover:text-gray-300"
                 }`}
               >
@@ -276,14 +276,14 @@ export function EnvEditorDialog({
                   onChange={(e) => updateEntry(i, "key", e.target.value)}
                   spellCheck={false}
                   placeholder="KEY"
-                  className="w-[35%] shrink-0 rounded border border-gray-700 bg-gray-800 px-2.5 py-1.5 font-mono text-xs text-gray-200 focus:outline-none focus:border-blue-500"
+                  className="glass-input w-[35%] shrink-0 rounded px-2.5 py-1.5 font-mono text-xs text-gray-200"
                 />
                 <input
                   value={entry.value}
                   onChange={(e) => updateEntry(i, "value", e.target.value)}
                   spellCheck={false}
                   placeholder="value"
-                  className="flex-1 rounded border border-gray-700 bg-gray-800 px-2.5 py-1.5 font-mono text-xs text-gray-300 focus:outline-none focus:border-blue-500"
+                  className="glass-input flex-1 rounded px-2.5 py-1.5 font-mono text-xs text-gray-300"
                 />
                 <button
                   onClick={() => removeEntry(i)}
@@ -296,7 +296,7 @@ export function EnvEditorDialog({
             ))}
             <button
               onClick={addEntry}
-              className="w-full rounded border border-dashed border-gray-700 py-1.5 text-xs text-gray-500 hover:text-gray-300 hover:border-gray-500 transition-colors"
+              className="w-full rounded border border-dashed border-white/10 py-1.5 text-xs text-gray-500 hover:text-gray-300 hover:border-white/20 transition-colors"
             >
               + Add variable
             </button>
@@ -306,7 +306,7 @@ export function EnvEditorDialog({
             value={raw}
             onChange={(e) => handleRawChange(e.target.value)}
             spellCheck={false}
-            className="flex-1 min-h-[300px] w-full rounded-lg border border-gray-700 bg-gray-800 px-4 py-3 font-mono text-sm text-gray-200 focus:outline-none focus:border-blue-500 resize-none"
+            className="glass-input flex-1 min-h-[300px] w-full rounded-lg px-4 py-3 font-mono text-sm text-gray-200 resize-none"
             placeholder="KEY=value"
           />
         ) : (
@@ -332,8 +332,8 @@ export function EnvEditorDialog({
                     placeholder={entry.value}
                     className={`w-full rounded border px-2.5 py-1.5 font-mono text-xs focus:outline-none focus:border-blue-500 ${
                       tplOverrides[entry.key]
-                        ? "border-blue-800 bg-blue-950/30 text-blue-300"
-                        : "border-gray-700 bg-gray-800 text-gray-500"
+                        ? "border-blue-400/40 bg-blue-500/10 text-blue-300"
+                        : "border-white/10 bg-slate-900/50 text-gray-500"
                     }`}
                   />
                 </div>
@@ -366,7 +366,7 @@ export function EnvEditorDialog({
             <button
               onClick={handleLoadFromMain}
               disabled={isLoading}
-              className="rounded-lg px-3 py-2 text-xs text-gray-400 hover:text-gray-200 border border-gray-700 hover:border-gray-500 disabled:opacity-50 transition-colors"
+              className="glass-button rounded-lg px-3 py-2 text-xs text-gray-300 hover:text-gray-100 disabled:opacity-50"
             >
               Load from main repo
             </button>
@@ -384,7 +384,7 @@ export function EnvEditorDialog({
             <button
               onClick={handleSave}
               disabled={saving || isLoading || !isDirty}
-              className="rounded-lg px-4 py-2 text-sm font-medium bg-blue-600 text-white hover:bg-blue-500 disabled:opacity-50 transition-colors"
+              className="glass-button-primary rounded-lg px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
             >
               {saving ? "Saving..." : "Save"}
             </button>

@@ -94,7 +94,7 @@ export default function PlanPage({
         {isStructured && (
           <button
             onClick={() => setViewMode(viewMode === "structured" ? "raw" : "structured")}
-            className="rounded-lg px-3 py-1.5 text-xs font-medium bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-gray-200 transition-colors"
+            className="glass-button rounded-lg px-3 py-1.5 text-xs font-medium text-gray-400 hover:text-gray-200 transition-colors"
           >
             {viewMode === "structured" ? "Raw 보기" : "구조화 보기"}
           </button>
@@ -104,12 +104,13 @@ export default function PlanPage({
       {loading ? (
         <div className="text-gray-500">Loading...</div>
       ) : !data || data.type === "empty" ? (
-        <div className="flex flex-col items-center justify-center rounded-lg border border-gray-800 bg-gray-900/50 p-16">
+        <div className="glass-card flex flex-col items-center justify-center rounded-lg p-16">
           <p className="text-gray-500 mb-4">플랜이 없습니다</p>
           <button
             onClick={() => setShowTerminal(true)}
             disabled={!worktreePath}
-            className="rounded-lg px-4 py-2 text-sm font-medium bg-purple-600 text-white hover:bg-purple-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="rounded-lg px-4 py-2 text-sm font-medium text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            style={{ background: "linear-gradient(135deg, rgb(147 51 234 / 0.5) 0%, rgb(126 34 206 / 0.4) 100%)", border: "1px solid rgb(147 51 234 / 0.3)" }}
             title={worktreePath ? "Claude Code로 플랜 생성" : "워크트리를 찾을 수 없습니다"}
           >
             AI로 플랜 만들기
@@ -126,8 +127,8 @@ export default function PlanPage({
       ) : (
         /* Raw file view */
         <div className="grid grid-cols-[240px_1fr] gap-4 h-[calc(100vh-200px)]">
-          <div className="overflow-auto rounded-lg border border-gray-800 bg-gray-900">
-            <div className="p-3 border-b border-gray-800">
+          <div className="glass-card overflow-auto rounded-lg">
+            <div className="p-3 border-b border-white/10">
               <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
                 Files
               </h3>
@@ -142,8 +143,8 @@ export default function PlanPage({
                   }}
                   className={`text-left px-3 py-2 text-sm transition-colors ${
                     selectedFile === file.name
-                      ? "bg-gray-800 text-gray-100"
-                      : "text-gray-400 hover:bg-gray-800/50 hover:text-gray-200"
+                      ? "bg-white/10 text-gray-100"
+                      : "text-gray-400 hover:bg-white/5 hover:text-gray-200"
                   }`}
                 >
                   {file.name}
@@ -152,16 +153,16 @@ export default function PlanPage({
             </div>
           </div>
 
-          <div className="overflow-auto rounded-lg border border-gray-800 bg-gray-900">
+          <div className="glass-card overflow-auto rounded-lg">
             {currentFile && !editing && (
               <div className="flex flex-col h-full">
-                <div className="flex items-center justify-between px-4 py-2 border-b border-gray-800">
+                <div className="flex items-center justify-between px-4 py-2 border-b border-white/10">
                   <span className="text-sm font-medium text-gray-300">
                     {currentFile.name}
                   </span>
                   <button
                     onClick={() => setEditing(true)}
-                    className="rounded px-3 py-1 text-xs font-medium bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-gray-200 transition-colors"
+                    className="glass-button rounded px-3 py-1 text-xs font-medium text-gray-400 hover:text-gray-200 transition-colors"
                   >
                     Edit
                   </button>

@@ -68,7 +68,7 @@ export default function DashboardPage() {
           <div className="flex items-center gap-3 text-xs text-gray-500">
             <span className="relative group cursor-default">
               branch <span className="font-mono text-gray-300">{totalBranches}</span>
-              <span className="absolute left-0 top-full mt-1 hidden group-hover:flex items-center gap-2 whitespace-nowrap rounded bg-gray-800 border border-gray-700 px-2.5 py-1.5 text-xs shadow-lg z-10">
+              <span className="absolute left-0 top-full mt-1 hidden group-hover:flex items-center gap-2 whitespace-nowrap rounded glass-modal px-2.5 py-1.5 text-xs shadow-2xl z-10">
                 <span className="text-green-400">active <span className="font-mono">{active.length}</span></span>
                 <span className="text-red-400">deactivated <span className="font-mono">{deactiveCount}</span></span>
               </span>
@@ -83,14 +83,14 @@ export default function DashboardPage() {
         <button
           onClick={handleRefreshGit}
           disabled={refreshing}
-          className="rounded-lg px-3 py-1.5 text-xs font-medium bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-gray-200 disabled:opacity-50 transition-colors"
+          className="glass-button rounded-lg px-3 py-1.5 text-xs font-medium text-gray-300 hover:text-gray-100 disabled:opacity-50"
         >
           {refreshing ? "Refreshing..." : "Refresh Git"}
         </button>
       </header>
 
       {active.length === 0 ? (
-        <div className="rounded-lg border border-gray-800 bg-gray-900/50 p-8 text-center text-gray-500">
+        <div className="glass-card rounded-lg p-8 text-center text-gray-500">
           No active worktrees. Click [+ Add] to create one.
         </div>
       ) : (
@@ -108,7 +108,7 @@ export default function DashboardPage() {
       <div className="flex items-center justify-between mt-6">
         <button
           onClick={() => setShowAddDialog(true)}
-          className="rounded-lg px-4 py-2 text-sm font-medium bg-blue-600 text-white hover:bg-blue-500 transition-colors"
+          className="glass-button-primary rounded-lg px-4 py-2 text-sm font-medium text-white"
         >
           + Add
         </button>
@@ -122,7 +122,7 @@ export default function DashboardPage() {
 
       <div className="mt-6 text-xs text-gray-600 flex gap-4">
         <span>
-          <span className="inline-block h-2 w-2 rounded-full bg-green-400 mr-1" />
+          <span className="inline-block h-2 w-2 rounded-full bg-green-400 glass-status-glow mr-1" />
           = running
         </span>
         <span>

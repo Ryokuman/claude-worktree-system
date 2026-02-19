@@ -13,7 +13,12 @@ export default function RootLayout({
 }) {
   return (
     <html lang="ko">
-      <body className="bg-gray-950 text-gray-100 min-h-screen">{children}</body>
+      <body
+        className="text-gray-100 min-h-screen"
+        style={{ background: "linear-gradient(135deg, rgb(15,23,42) 0%, rgb(3,7,18) 50%, rgb(15,23,42) 100%)" }}
+      >
+        {children}
+      </body>
     </html>
   );
 }

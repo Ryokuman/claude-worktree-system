@@ -44,8 +44,8 @@ export function AddWorktreeDialog({
   }
 
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/60">
-      <div className="w-full max-w-md rounded-xl border border-gray-700 bg-gray-900 p-6 shadow-2xl">
+    <div className="backdrop-glass fixed inset-0 z-40 flex items-center justify-center">
+      <div className="glass-modal w-full max-w-md rounded-xl p-6 shadow-2xl">
         <h2 className="text-lg font-semibold mb-4">Add Worktree</h2>
 
         <label className="block text-sm text-gray-400 mb-2">
@@ -54,7 +54,7 @@ export function AddWorktreeDialog({
         <select
           value={selected}
           onChange={(e) => setSelected(e.target.value)}
-          className="w-full rounded-lg border border-gray-700 bg-gray-800 px-3 py-2 text-sm text-gray-200 mb-4 focus:outline-none focus:border-blue-500"
+          className="glass-input w-full rounded-lg px-3 py-2 text-sm text-gray-200 mb-4"
         >
           <option value="">-- Select --</option>
           {branches
@@ -74,7 +74,7 @@ export function AddWorktreeDialog({
           value={healthCheckPath}
           onChange={(e) => setHealthCheckPath(e.target.value)}
           placeholder="/"
-          className="w-full rounded-lg border border-gray-700 bg-gray-800 px-3 py-2 text-sm text-gray-200 mb-4 focus:outline-none focus:border-blue-500"
+          className="glass-input w-full rounded-lg px-3 py-2 text-sm text-gray-200 mb-4"
         />
 
         <div className="flex justify-end gap-2">
@@ -87,7 +87,7 @@ export function AddWorktreeDialog({
           <button
             onClick={handleCreate}
             disabled={!selected || loading}
-            className="rounded-lg px-4 py-2 text-sm font-medium bg-blue-600 text-white hover:bg-blue-500 disabled:opacity-50 transition-colors"
+            className="glass-button-primary rounded-lg px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
           >
             Create
           </button>

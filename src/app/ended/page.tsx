@@ -32,7 +32,7 @@ export default function EndedPage() {
       {loading ? (
         <div className="text-gray-500">Loading...</div>
       ) : ended.length === 0 ? (
-        <div className="rounded-lg border border-gray-800 bg-gray-900/50 p-8 text-center text-gray-500">
+        <div className="glass-card rounded-lg p-8 text-center text-gray-500">
           No completed tasks yet.
         </div>
       ) : (
@@ -40,7 +40,7 @@ export default function EndedPage() {
           {ended.map((item) => (
             <div
               key={item.taskNo}
-              className="flex items-center justify-between rounded-lg border border-gray-800 bg-gray-900 px-4 py-3"
+              className="glass-card flex items-center justify-between rounded-lg px-4 py-3"
             >
               <div className="flex items-center gap-4">
                 <span className="font-mono text-sm font-semibold text-gray-400">
@@ -51,7 +51,7 @@ export default function EndedPage() {
               <div className="flex items-center gap-3">
                 <Link
                   href={`/plan/${encodeURIComponent(item.branch)}`}
-                  className="text-xs text-gray-500 hover:text-gray-300 transition-colors"
+                  className="text-xs text-gray-500 hover:text-blue-400 transition-colors"
                 >
                   plan
                 </Link>
