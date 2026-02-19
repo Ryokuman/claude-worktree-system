@@ -240,28 +240,53 @@ app.prepare().then(async () => {
 
     // --- Health checker (inline of startHealthChecker) ---
     console.log(`[health] Starting health checker (interval: ${env.HEALTHCHECK_INTERVAL}ms)`);
+
+    function findPidByPort(port: number): number | null {
+      try {
+        const { execSync } = require("child_process");
+        const output = execSync(`lsof -ti :${port}`, { encoding: "utf-8" }).trim();
+        if (!output) return null;
+        const pid = parseInt(output.split("\n")[0], 10);
+        return Number.isNaN(pid) ? null : pid;
+      } catch { return null; }
+    }
+
     setInterval(async () => {
-      const running = (readJson("active.json") as any[]).filter((w) => w.status === "running");
-      for (const worktree of running) {
+      const allWorktrees = readJson("active.json") as any[];
+
+      for (const worktree of allWorktrees) {
+        if (!worktree.port) continue;
+
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 5000);
+        let portAlive = false;
+
         try {
-          const controller = new AbortController();
-          const timeout = setTimeout(() => controller.abort(), 5000);
           const healthPath = worktree.healthCheckPath || env.HEALTHCHECK_PATH;
-          const res = await fetch(`http://localhost:${worktree.port}${healthPath}`, {
+          await fetch(`http://localhost:${worktree.port}${healthPath}`, {
             signal: controller.signal,
+            redirect: "manual",
           });
           clearTimeout(timeout);
-          if (!res.ok) {
-            console.log(`[health] ${worktree.taskNo} unhealthy (status ${res.status})`);
-            const active = readJson("active.json") as any[];
-            const wt = active.find((w) => w.taskNo === worktree.taskNo);
-            if (wt) { wt.status = "stopped"; wt.pid = null; writeJson("active.json", active); }
-          }
+          portAlive = true;
         } catch {
-          console.log(`[health] ${worktree.taskNo} unreachable, marking as stopped`);
+          clearTimeout(timeout);
+          portAlive = false;
+        }
+
+        if (worktree.status === "running" && !portAlive) {
+          // Running → Stopped: port is unreachable, mark as stopped
+          console.log(`[health] ${worktree.taskNo} port ${worktree.port} unreachable, marking as stopped`);
           const active = readJson("active.json") as any[];
-          const wt = active.find((w) => w.taskNo === worktree.taskNo);
+          const wt = active.find((w: any) => w.taskNo === worktree.taskNo);
           if (wt) { wt.status = "stopped"; wt.pid = null; writeJson("active.json", active); }
+        } else if (worktree.status === "stopped" && portAlive) {
+          // Stopped → Running: recover orphaned process
+          const pid = worktree.pid || findPidByPort(worktree.port);
+          console.log(`[health] ${worktree.taskNo} port ${worktree.port} is alive (PID: ${pid}), recovering to running`);
+          const active = readJson("active.json") as any[];
+          const wt = active.find((w: any) => w.taskNo === worktree.taskNo);
+          if (wt) { wt.status = "running"; wt.pid = pid; writeJson("active.json", active); }
         }
       }
     }, env.HEALTHCHECK_INTERVAL);

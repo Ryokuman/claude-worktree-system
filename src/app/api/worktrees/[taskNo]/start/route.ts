@@ -6,6 +6,18 @@ import { readJson, writeJson } from "@/lib/store";
 import { findAvailablePort } from "@/lib/port-manager";
 import type { ActiveWorktree } from "@/lib/types";
 
+/** Find PID listening on a given port via lsof. Returns null if not found. */
+function findPidByPort(port: number): number | null {
+  try {
+    const output = execSync(`lsof -ti :${port}`, { encoding: "utf-8" }).trim();
+    if (!output) return null;
+    const pid = parseInt(output.split("\n")[0], 10);
+    return Number.isNaN(pid) ? null : pid;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * POST /api/worktrees/:taskNo/start
  *
@@ -33,6 +45,16 @@ export async function POST(
     if (!worktree.port) {
       worktree.port = await findAvailablePort();
       writeJson("active.json", active);
+    }
+
+    // Check if a process is already running on this port (orphaned process recovery)
+    const existingPid = findPidByPort(worktree.port);
+    if (existingPid) {
+      console.log(`[process] Found existing process on port ${worktree.port} (PID: ${existingPid}), recovering for ${taskNo}`);
+      worktree.status = "running";
+      worktree.pid = existingPid;
+      writeJson("active.json", active);
+      return NextResponse.json({ status: "started", taskNo });
     }
 
     // Install deps if node_modules missing

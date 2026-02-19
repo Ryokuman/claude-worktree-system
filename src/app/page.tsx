@@ -22,6 +22,7 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [healthChecking, setHealthChecking] = useState(false);
   const [selectedTaskNo, setSelectedTaskNo] = useState<string | null>(null);
   const [panelVisible, setPanelVisible] = useState(false);
 
@@ -64,6 +65,16 @@ export default function DashboardPage() {
       await fetchStatus();
     } finally {
       setRefreshing(false);
+    }
+  }, [fetchStatus]);
+
+  const handleHealthCheck = useCallback(async () => {
+    setHealthChecking(true);
+    try {
+      await fetch("/api/health-check", { method: "POST" });
+      await fetchStatus();
+    } finally {
+      setHealthChecking(false);
     }
   }, [fetchStatus]);
 
@@ -130,13 +141,23 @@ export default function DashboardPage() {
               )}
             </div>
           </div>
-          <button
-            onClick={handleRefreshGit}
-            disabled={refreshing}
-            className="glass-button rounded-lg px-3 py-1.5 text-xs font-medium text-gray-300 hover:text-gray-100 disabled:opacity-50"
-          >
-            {refreshing ? "Refreshing..." : "Refresh Git"}
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleHealthCheck}
+              disabled={healthChecking}
+              className="glass-button rounded-lg px-3 py-1.5 text-xs font-medium text-gray-300 hover:text-gray-100 disabled:opacity-50"
+              title="Sync server status with actual ports"
+            >
+              {healthChecking ? "Checking..." : "Server Refresh"}
+            </button>
+            <button
+              onClick={handleRefreshGit}
+              disabled={refreshing}
+              className="glass-button rounded-lg px-3 py-1.5 text-xs font-medium text-gray-300 hover:text-gray-100 disabled:opacity-50"
+            >
+              {refreshing ? "Refreshing..." : "Refresh Git"}
+            </button>
+          </div>
         </div>
 
         {active.length === 0 ? (
@@ -209,13 +230,24 @@ export default function DashboardPage() {
             <h1 className="text-base font-bold text-gray-100">
               Worktree Handler
             </h1>
-            <button
-              onClick={handleRefreshGit}
-              disabled={refreshing}
-              className="text-[10px] text-gray-500 hover:text-gray-300 transition-colors disabled:opacity-50"
-            >
-              {refreshing ? "..." : "↻"}
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleHealthCheck}
+                disabled={healthChecking}
+                className="text-[10px] text-gray-500 hover:text-gray-300 transition-colors disabled:opacity-50"
+                title="Server Refresh"
+              >
+                {healthChecking ? "..." : "⟳"}
+              </button>
+              <button
+                onClick={handleRefreshGit}
+                disabled={refreshing}
+                className="text-[10px] text-gray-500 hover:text-gray-300 transition-colors disabled:opacity-50"
+                title="Refresh Git"
+              >
+                {refreshing ? "..." : "↻"}
+              </button>
+            </div>
           </div>
           <div className="flex items-center gap-3 text-[11px] text-gray-500">
             <span className="relative group cursor-default">
