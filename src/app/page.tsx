@@ -53,7 +53,17 @@ export default function DashboardPage() {
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
       <header className="flex items-center justify-between mb-8">
-        <h1 className="text-2xl font-bold text-gray-100">Worktree Handler</h1>
+        <div className="flex items-center gap-4">
+          <h1 className="text-2xl font-bold text-gray-100">Worktree Handler</h1>
+          <div className="flex items-center gap-3 text-xs text-gray-500">
+            <span>
+              active <span className="font-mono text-gray-300">{active.length}</span>
+            </span>
+            <span>
+              branches <span className="font-mono text-gray-300">{deactive.length}</span>
+            </span>
+          </div>
+        </div>
         <button
           onClick={handleRefreshGit}
           disabled={refreshing}

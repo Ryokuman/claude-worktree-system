@@ -53,11 +53,13 @@ export function AddWorktreeDialog({
           className="w-full rounded-lg border border-gray-700 bg-gray-800 px-3 py-2 text-sm text-gray-200 mb-4 focus:outline-none focus:border-blue-500"
         >
           <option value="">-- Select --</option>
-          {branches.map((b) => (
-            <option key={b.branch} value={b.branch}>
-              {b.taskNo} - {b.branch}
-            </option>
-          ))}
+          {branches
+            .filter((b) => !["main", "master", "develop", "dev"].includes(b.branch))
+            .map((b) => (
+              <option key={b.branch} value={b.branch}>
+                {b.taskNo} - {b.branch}
+              </option>
+            ))}
         </select>
 
         <label className="block text-sm text-gray-400 mb-2">
