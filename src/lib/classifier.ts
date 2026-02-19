@@ -7,7 +7,6 @@ import type { DeactiveBranch } from "./types";
 
 interface BranchInfo {
   name: string;
-  isRemote: boolean;
   lastCommit: string;
 }
 
@@ -17,31 +16,54 @@ interface WorktreeInfo {
   head: string;
 }
 
-function listBranches(): BranchInfo[] {
-  const raw = execSync("git branch -a --format='%(refname:short)|%(objectname:short)'", {
-    cwd: env.MAIN_REPO_PATH,
-    encoding: "utf-8",
-  });
+/** 리모트 이름 목록 */
+function getRemoteNames(): string[] {
+  try {
+    const raw = execSync("git remote", {
+      cwd: env.MAIN_REPO_PATH,
+      encoding: "utf-8",
+    });
+    return raw.trim().split("\n").filter(Boolean);
+  } catch {
+    return ["origin"];
+  }
+}
 
+/** 리모트 브랜치만 가져온다 (리모트 접두사 제거) */
+function listBranches(): BranchInfo[] {
+  const raw = execSync(
+    "git branch -r --format='%(refname:short)|%(objectname:short)'",
+    { cwd: env.MAIN_REPO_PATH, encoding: "utf-8" },
+  );
+
+  const remotes = getRemoteNames();
   const branches: BranchInfo[] = [];
   const seen = new Set<string>();
 
   for (const line of raw.trim().split("\n")) {
     if (!line) continue;
     const [fullName, commit] = line.split("|");
-    const isRemote = fullName.startsWith("origin/");
-    const name = isRemote ? fullName.replace("origin/", "") : fullName;
+
+    // Strip remote prefix (dynamos/feat/... → feat/...)
+    let name = fullName;
+    for (const remote of remotes) {
+      if (fullName.startsWith(remote + "/")) {
+        name = fullName.slice(remote.length + 1);
+        break;
+      }
+    }
 
     if (name === "HEAD" || name.includes("HEAD")) continue;
     if (seen.has(name)) continue;
     seen.add(name);
 
-    branches.push({ name, isRemote, lastCommit: commit || "" });
+    branches.push({ name, lastCommit: commit || "" });
   }
 
   return branches;
 }
 
+/** git worktree list 로 실제 워크트리 목록 조회 */
 function listWorktrees(): WorktreeInfo[] {
   const raw = execSync("git worktree list --porcelain", {
     cwd: env.MAIN_REPO_PATH,
@@ -86,23 +108,29 @@ export function classifyBranches(): void {
 
     const branches = listBranches();
     const worktrees = listWorktrees();
+
+    // Source of truth: git worktree list (실제 파일시스템)
+    const mainRepoPath = env.MAIN_REPO_PATH;
+    const worktreeBranches = new Set<string>();
+
+    for (const wt of worktrees) {
+      if (!wt.branch) continue;
+      if (wt.path === mainRepoPath) continue;
+      worktreeBranches.add(wt.branch);
+    }
+
+    // Auto-register worktrees not in active.json
     const active = readJson<ActiveWorktree>("active.json");
     const activeBranches = new Set(active.map((w) => w.branch));
 
-    // Auto-register existing git worktrees that aren't in active.json
-    const mainRepoPath = env.MAIN_REPO_PATH;
     for (const wt of worktrees) {
       if (!wt.branch) continue;
       if (wt.path === mainRepoPath) continue;
       if (activeBranches.has(wt.branch)) continue;
 
-      const taskNo = extractTaskNo(wt.branch);
-      const taskName = branchToTaskName(wt.branch);
-
-      const list = readJson<ActiveWorktree>("active.json");
-      list.push({
-        taskNo,
-        taskName,
+      active.push({
+        taskNo: extractTaskNo(wt.branch),
+        taskName: branchToTaskName(wt.branch),
         branch: wt.branch,
         path: wt.path,
         port: 0,
@@ -110,17 +138,22 @@ export function classifyBranches(): void {
         pid: null,
         createdAt: new Date().toISOString().split("T")[0],
       });
-      writeJson("active.json", list);
       activeBranches.add(wt.branch);
-      console.log(`[classifier] Auto-registered existing worktree: ${wt.branch}`);
+      console.log(
+        `[classifier] Auto-registered existing worktree: ${wt.branch}`,
+      );
     }
 
-    // Branches not in active → deactive
+    // Remove active entries whose worktree no longer exists
+    const stillValid = active.filter((w) => worktreeBranches.has(w.branch));
+    writeJson("active.json", stillValid);
+
+    // Deactive = remote branches - worktree branches - main/master/develop
     const deactive: DeactiveBranch[] = [];
 
     for (const branch of branches) {
       if (["main", "master", "develop"].includes(branch.name)) continue;
-      if (activeBranches.has(branch.name)) continue;
+      if (worktreeBranches.has(branch.name)) continue;
 
       deactive.push({
         branch: branch.name,
@@ -131,14 +164,6 @@ export function classifyBranches(): void {
     }
 
     writeJson("deactive.json", sortDeactive(deactive));
-
-    // Remove active entries whose branches no longer exist
-    const allBranchNames = new Set(branches.map((b) => b.name));
-    const currentActive = readJson<ActiveWorktree>("active.json");
-    const stillValid = currentActive.filter((w) => allBranchNames.has(w.branch));
-    if (stillValid.length !== currentActive.length) {
-      writeJson("active.json", stillValid);
-    }
   } catch (err) {
     console.error("[classifier] Error classifying branches:", err);
   }
