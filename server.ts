@@ -24,6 +24,35 @@ app.prepare().then(async () => {
 
   const wss = new WebSocketServer({ noServer: true });
 
+  // ── Persistent PTY session management ──
+  interface PtySession {
+    pty: import("node-pty").IPty;
+    scrollback: string;
+    alive: boolean;
+    exitCode: number | null;
+    ws: import("ws").WebSocket | null;
+    cleanupTimer: ReturnType<typeof setTimeout> | null;
+  }
+
+  const ptySessions = new Map<string, PtySession>();
+  const SCROLLBACK_LIMIT = 100_000;
+  const SESSION_ORPHAN_TIMEOUT = 5 * 60 * 1000; // 5 min
+
+  function destroySession(sessionId: string) {
+    const s = ptySessions.get(sessionId);
+    if (!s) return;
+    if (s.cleanupTimer) clearTimeout(s.cleanupTimer);
+    if (s.alive) { try { s.pty.kill(); } catch {} }
+    ptySessions.delete(sessionId);
+  }
+
+  function scheduleCleanup(sessionId: string) {
+    const s = ptySessions.get(sessionId);
+    if (!s) return;
+    if (s.cleanupTimer) clearTimeout(s.cleanupTimer);
+    s.cleanupTimer = setTimeout(() => destroySession(sessionId), SESSION_ORPHAN_TIMEOUT);
+  }
+
   // WebSocket upgrade: intercept /ws/terminal
   server.on("upgrade", (req, socket, head) => {
     const { pathname } = parse(req.url || "", true);
@@ -37,13 +66,67 @@ app.prepare().then(async () => {
     }
   });
 
-  // Handle terminal WebSocket connections — spawn PTY directly
+  // Handle terminal WebSocket connections with session persistence
   wss.on("connection", async (ws, req) => {
     const { query } = parse(req.url || "", true);
+    const sessionId = query.sessionId as string;
     const cwd = (query.cwd as string) || process.env.HOME || "/tmp";
     const initialCommand = query.initialCommand as string | undefined;
     const shell = process.env.SHELL || "/bin/zsh";
 
+    if (!sessionId) {
+      ws.send(`\r\n\x1b[31m[Missing sessionId]\x1b[0m\r\n`);
+      ws.close();
+      return;
+    }
+
+    const existing = ptySessions.get(sessionId);
+
+    // ── Reattach to existing session ──
+    if (existing) {
+      if (existing.cleanupTimer) clearTimeout(existing.cleanupTimer);
+      existing.cleanupTimer = null;
+      existing.ws = ws;
+
+      // Replay scrollback so client sees what it missed
+      if (existing.scrollback) {
+        ws.send(JSON.stringify({ type: "pty:replay" }));
+        ws.send(existing.scrollback);
+      }
+
+      if (!existing.alive) {
+        ws.send(JSON.stringify({ type: "pty:exit", code: existing.exitCode ?? 0 }));
+        destroySession(sessionId);
+        return;
+      }
+
+      // WebSocket → PTY
+      ws.on("message", (msg) => {
+        if (!existing.alive) return;
+        const message = msg.toString();
+        try {
+          const parsed = JSON.parse(message);
+          if (parsed.type === "resize" && parsed.cols && parsed.rows) {
+            existing.pty.resize(parsed.cols, parsed.rows);
+            return;
+          }
+          if (parsed.type === "kill") {
+            destroySession(sessionId);
+            return;
+          }
+        } catch {}
+        existing.pty.write(message);
+      });
+
+      ws.on("close", () => {
+        if (existing.ws === ws) existing.ws = null;
+        if (ptySessions.has(sessionId)) scheduleCleanup(sessionId);
+      });
+
+      return;
+    }
+
+    // ── Create new session ──
     let ptyProcess: import("node-pty").IPty;
     try {
       const pty = await import("node-pty");
@@ -60,19 +143,45 @@ app.prepare().then(async () => {
       return;
     }
 
+    const session: PtySession = {
+      pty: ptyProcess,
+      scrollback: "",
+      alive: true,
+      exitCode: null,
+      ws,
+      cleanupTimer: null,
+    };
+    ptySessions.set(sessionId, session);
+
     if (initialCommand) {
       ptyProcess.write(initialCommand + "\n");
     }
 
-    // PTY → WebSocket
-    const dataHandler = ptyProcess.onData((data: string) => {
-      if (ws.readyState === ws.OPEN) {
-        ws.send(data);
+    // PTY → client (+ scrollback buffer)
+    ptyProcess.onData((data: string) => {
+      session.scrollback += data;
+      if (session.scrollback.length > SCROLLBACK_LIMIT) {
+        session.scrollback = session.scrollback.slice(-SCROLLBACK_LIMIT);
       }
+      if (session.ws && session.ws.readyState === session.ws.OPEN) {
+        session.ws.send(data);
+      }
+    });
+
+    // PTY exit
+    ptyProcess.onExit(({ exitCode }) => {
+      session.alive = false;
+      session.exitCode = exitCode;
+      if (session.ws && session.ws.readyState === session.ws.OPEN) {
+        session.ws.send(JSON.stringify({ type: "pty:exit", code: exitCode }));
+      }
+      // Don't destroy immediately — let client reconnect and see exit status
+      scheduleCleanup(sessionId);
     });
 
     // WebSocket → PTY
     ws.on("message", (msg) => {
+      if (!session.alive) return;
       const message = msg.toString();
       try {
         const parsed = JSON.parse(message);
@@ -80,15 +189,17 @@ app.prepare().then(async () => {
           ptyProcess.resize(parsed.cols, parsed.rows);
           return;
         }
-      } catch {
-        // Not JSON, treat as regular input
-      }
+        if (parsed.type === "kill") {
+          destroySession(sessionId);
+          return;
+        }
+      } catch {}
       ptyProcess.write(message);
     });
 
     ws.on("close", () => {
-      dataHandler.dispose();
-      ptyProcess.kill();
+      if (session.ws === ws) session.ws = null;
+      if (ptySessions.has(sessionId)) scheduleCleanup(sessionId);
     });
   });
 
