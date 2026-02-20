@@ -3,7 +3,8 @@ import { spawn, execSync } from "child_process";
 import fs from "fs";
 import path from "path";
 import { readJson, writeJson } from "@/lib/store";
-import { findAvailablePort } from "@/lib/port-manager";
+import { ensureLogDir, getLogPath } from "@/lib/log-manager";
+import { readWorktreeEnv } from "@/lib/env-generator";
 import type { ActiveWorktree } from "@/lib/types";
 
 /** Find PID listening on a given port via lsof. Returns null if not found. */
@@ -22,7 +23,8 @@ function findPidByPort(port: number): number | null {
  * POST /api/worktrees/:taskNo/start
  *
  * 워크트리의 개발 서버를 시작한다. (A8)
- * npm install (node_modules 없으면) → next dev -p {port} spawn
+ * npm install (node_modules 없으면) → npm run dev spawn
+ * PORT는 워크트리 .env 파일에서 읽어 active.json에 반영
  *
  * Params: taskNo - 워크트리 식별자 (e.g. "DV-494", "TTN-1")
  *
@@ -41,10 +43,19 @@ export async function POST(
     if (worktree.status === "running")
       throw new Error(`${taskNo} is already running`);
 
-    // Assign port if not yet assigned
+    // Read PORT from worktree's .env file
+    const envEntries = readWorktreeEnv(worktree.path);
+    const portEntry = envEntries?.find((e) => e.key === "PORT");
+    if (portEntry) {
+      const envPort = parseInt(portEntry.value, 10);
+      if (!Number.isNaN(envPort) && envPort !== worktree.port) {
+        worktree.port = envPort;
+        writeJson("active.json", active);
+      }
+    }
+
     if (!worktree.port) {
-      worktree.port = await findAvailablePort();
-      writeJson("active.json", active);
+      throw new Error(`${taskNo}: PORT not found in .env`);
     }
 
     // Check if a process is already running on this port (orphaned process recovery)
@@ -64,14 +75,18 @@ export async function POST(
       execSync("npm install", { cwd: worktree.path, stdio: "inherit" });
     }
 
-    const child = spawn("npx", ["next", "dev", "-p", String(worktree.port)], {
+    // Redirect stdout/stderr to log file via file descriptor
+    ensureLogDir();
+    const logFd = fs.openSync(getLogPath(taskNo), "a");
+
+    const child = spawn("npm", ["run", "dev"], {
       cwd: worktree.path,
       detached: true,
-      stdio: "ignore",
-      env: { ...process.env, PORT: String(worktree.port) },
+      stdio: ["ignore", logFd, logFd],
     });
 
     child.unref();
+    fs.closeSync(logFd);
 
     worktree.status = "running";
     worktree.pid = child.pid || null;

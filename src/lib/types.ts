@@ -57,7 +57,7 @@ export interface TerminalSession {
   createdAt: number;
 }
 
-export type PanelTab = "plan" | "terminal" | "tasks" | "git";
+export type PanelTab = "plan" | "terminal" | "logs" | "tasks" | "git";
 
 export interface GitCommitRaw {
   hash: string;

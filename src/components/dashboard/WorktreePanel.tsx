@@ -25,6 +25,10 @@ const GitTabView = dynamic(
   () => import("@/components/panel/GitTabView").then((m) => m.GitTabView),
   { ssr: false },
 );
+const LogsTabView = dynamic(
+  () => import("@/components/panel/LogsTabView").then((m) => m.LogsTabView),
+  { ssr: false },
+);
 
 interface WorktreePanelProps {
   worktree: ActiveWorktree;
@@ -156,6 +160,14 @@ export function WorktreePanel({
           {terminalMounted && (
             <TerminalTabView cwd={worktree.path} />
           )}
+        </div>
+
+        {/* Logs Tab */}
+        <div
+          className="absolute inset-0"
+          style={{ display: activeTab === "logs" ? "flex" : "none" }}
+        >
+          <LogsTabView taskNo={worktree.taskNo} status={worktree.status} />
         </div>
 
         {/* Tasks Tab */}

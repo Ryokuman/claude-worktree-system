@@ -23,6 +23,7 @@ app.prepare().then(async () => {
   });
 
   const wss = new WebSocketServer({ noServer: true });
+  const wssLogs = new WebSocketServer({ noServer: true });
 
   // ── Persistent PTY session management ──
   interface PtySession {
@@ -53,13 +54,17 @@ app.prepare().then(async () => {
     s.cleanupTimer = setTimeout(() => destroySession(sessionId), SESSION_ORPHAN_TIMEOUT);
   }
 
-  // WebSocket upgrade: intercept /ws/terminal
+  // WebSocket upgrade: intercept /ws/terminal and /ws/logs
   server.on("upgrade", (req, socket, head) => {
     const { pathname } = parse(req.url || "", true);
 
     if (pathname === "/ws/terminal") {
       wss.handleUpgrade(req, socket, head, (ws) => {
         wss.emit("connection", ws, req);
+      });
+    } else if (pathname === "/ws/logs") {
+      wssLogs.handleUpgrade(req, socket, head, (ws) => {
+        wssLogs.emit("connection", ws, req);
       });
     } else {
       // Let Next.js HMR handle its own WebSocket upgrades
@@ -200,6 +205,92 @@ app.prepare().then(async () => {
     ws.on("close", () => {
       if (session.ws === ws) session.ws = null;
       if (ptySessions.has(sessionId)) scheduleCleanup(sessionId);
+    });
+  });
+
+  // ── Log streaming WebSocket handler ──
+  wssLogs.on("connection", (ws, req) => {
+    const { query } = parse(req.url || "", true);
+    const taskNo = query.taskNo as string;
+
+    if (!taskNo) {
+      ws.close(1008, "Missing taskNo");
+      return;
+    }
+
+    const { getLogPath } = require("./src/lib/log-manager");
+    const logPath = getLogPath(taskNo) as string;
+    const logDir = path.dirname(logPath);
+    let offset = 0;
+
+    // Send existing log content or notify no log file
+    if (fs.existsSync(logPath)) {
+      const content = fs.readFileSync(logPath, "utf-8");
+      if (content.length > 0 && ws.readyState === ws.OPEN) {
+        ws.send(content);
+      }
+      offset = fs.statSync(logPath).size;
+    } else if (ws.readyState === ws.OPEN) {
+      ws.send(JSON.stringify({ type: "log:no-file" }));
+    }
+
+    function sendDelta() {
+      try {
+        if (!fs.existsSync(logPath)) return;
+        const stat = fs.statSync(logPath);
+        if (stat.size > offset) {
+          const fd = fs.openSync(logPath, "r");
+          const buf = Buffer.alloc(stat.size - offset);
+          fs.readSync(fd, buf, 0, buf.length, offset);
+          fs.closeSync(fd);
+          offset = stat.size;
+          if (ws.readyState === ws.OPEN) {
+            ws.send(buf.toString("utf-8"));
+          }
+        } else if (stat.size < offset) {
+          // File was truncated (cleared)
+          offset = 0;
+          if (ws.readyState === ws.OPEN) {
+            ws.send(JSON.stringify({ type: "log:clear" }));
+          }
+        }
+      } catch {
+        // File may not exist yet
+      }
+    }
+
+    // Watch log file (and directory for file creation)
+    const logWatcher = watch(fs.existsSync(logPath) ? logPath : logDir, {
+      persistent: false,
+      ignoreInitial: true,
+      depth: 0,
+    });
+
+    let watchingFile = fs.existsSync(logPath);
+
+    logWatcher.on("change", sendDelta);
+    logWatcher.on("add", (addedPath: string) => {
+      if (path.resolve(addedPath) === path.resolve(logPath) && !watchingFile) {
+        watchingFile = true;
+        logWatcher.add(logPath);
+        sendDelta();
+      }
+    });
+
+    // Handle client messages (clear)
+    ws.on("message", (msg) => {
+      try {
+        const parsed = JSON.parse(msg.toString());
+        if (parsed.type === "clear") {
+          const { clearLog } = require("./src/lib/log-manager");
+          clearLog(taskNo);
+          offset = 0;
+        }
+      } catch {}
+    });
+
+    ws.on("close", () => {
+      logWatcher.close();
     });
   });
 

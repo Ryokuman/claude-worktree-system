@@ -10,6 +10,7 @@ interface PanelTabBarProps {
 const TABS: { key: PanelTab; label: string }[] = [
   { key: "plan", label: "Plan" },
   { key: "terminal", label: "Terminal" },
+  { key: "logs", label: "Logs" },
   { key: "tasks", label: "Tasks" },
   { key: "git", label: "Git" },
 ];
