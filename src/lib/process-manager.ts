@@ -38,14 +38,19 @@ export function stopDevServer(taskNo: string): void {
 
   if (!pid) throw new Error(`${taskNo} has no running process`);
 
-  try {
-    process.kill(-pid, "SIGTERM");
-  } catch {
+  // Kill all processes on this port (safe — avoids process group kill that can take down handler)
+  if (worktree.port) {
     try {
-      process.kill(pid, "SIGTERM");
+      execSync(`lsof -ti :${worktree.port} | xargs kill -SIGTERM`, {
+        encoding: "utf-8",
+        stdio: "ignore",
+      });
     } catch {
-      // Process already dead
+      // Fallback: kill single PID
+      try { process.kill(pid, "SIGTERM"); } catch {}
     }
+  } else {
+    try { process.kill(pid, "SIGTERM"); } catch {}
   }
 
   worktree.status = "stopped";
