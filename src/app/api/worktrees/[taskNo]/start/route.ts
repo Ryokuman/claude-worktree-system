@@ -79,10 +79,19 @@ export async function POST(
     ensureLogDir();
     const logFd = fs.openSync(getLogPath(taskNo), "a");
 
+    // Build env: system vars + worktree .env (worktree values override handler's)
+    const worktreeEnv: Record<string, string> = {};
+    if (envEntries) {
+      for (const e of envEntries) {
+        worktreeEnv[e.key] = e.value;
+      }
+    }
+
     const child = spawn("npm", ["run", "dev"], {
       cwd: worktree.path,
       detached: true,
       stdio: ["ignore", logFd, logFd],
+      env: { ...process.env, ...worktreeEnv },
     });
 
     child.unref();
