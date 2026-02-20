@@ -3,9 +3,11 @@
  *
  * Prevents concurrent start/stop operations on the same worktree,
  * which can cause multiple dev server processes to be spawned (TOCTOU race).
+ *
+ * Uses globalThis to survive Next.js dev-mode module re-evaluation.
  */
 
-const locks = new Map<string, Promise<void>>();
+const globalLocks = (globalThis as any).__taskLocks ??= new Map<string, Promise<void>>();
 
 /**
  * Acquire a lock for the given key (typically taskNo).
@@ -15,9 +17,8 @@ const locks = new Map<string, Promise<void>>();
 export async function acquireTaskLock(
   taskNo: string,
 ): Promise<() => void> {
-  // Wait for any existing lock to release
-  while (locks.has(taskNo)) {
-    await locks.get(taskNo);
+  while (globalLocks.has(taskNo)) {
+    await globalLocks.get(taskNo);
   }
 
   let release!: () => void;
@@ -25,10 +26,10 @@ export async function acquireTaskLock(
     release = resolve;
   });
 
-  locks.set(taskNo, promise);
+  globalLocks.set(taskNo, promise);
 
   return () => {
-    locks.delete(taskNo);
+    globalLocks.delete(taskNo);
     release();
   };
 }

@@ -114,6 +114,7 @@ export async function POST(
 
       worktree.status = "running";
       worktree.pid = child.pid || null;
+      worktree.startedAt = new Date().toISOString();
       writeJson("active.json", active);
 
       console.log(

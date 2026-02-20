@@ -330,7 +330,8 @@ app.prepare().then(async () => {
     watcher.on("error", (err) => console.error("[watcher] Error:", err));
 
     // --- Health checker (inline of startHealthChecker) ---
-    console.log(`[health] Starting health checker (interval: ${env.HEALTHCHECK_INTERVAL}ms)`);
+    const STARTUP_GRACE_MS = 30_000; // 30s grace period after start before marking as stopped
+    console.log(`[health] Starting health checker (interval: ${env.HEALTHCHECK_INTERVAL}ms, grace: ${STARTUP_GRACE_MS}ms)`);
 
     function findPidByPort(port: number): number | null {
       try {
@@ -366,6 +367,13 @@ app.prepare().then(async () => {
         }
 
         if (worktree.status === "running" && !portAlive) {
+          // Skip if within startup grace period
+          if (worktree.startedAt) {
+            const elapsed = Date.now() - new Date(worktree.startedAt).getTime();
+            if (elapsed < STARTUP_GRACE_MS) {
+              continue;
+            }
+          }
           // Running → Stopped: port is unreachable, mark as stopped
           console.log(`[health] ${worktree.taskNo} port ${worktree.port} unreachable, marking as stopped`);
           const active = readJson("active.json") as any[];

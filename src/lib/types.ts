@@ -7,6 +7,7 @@ export interface ActiveWorktree {
   status: "running" | "stopped" | "installing";
   pid: number | null;
   createdAt: string;
+  startedAt?: string;
   hasPlan?: boolean;
   healthCheckPath?: string;
 }
