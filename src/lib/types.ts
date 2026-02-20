@@ -4,7 +4,7 @@ export interface ActiveWorktree {
   branch: string;
   path: string;
   port: number;
-  status: "running" | "stopped";
+  status: "running" | "stopped" | "installing";
   pid: number | null;
   createdAt: string;
   hasPlan?: boolean;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import Link from "next/link";
 import type { ActiveWorktree } from "@/lib/types";
 import { EnvEditorDialog } from "./EnvEditorDialog";
@@ -13,8 +13,11 @@ interface WorktreeCardProps {
 export function WorktreeCard({ worktree, onRefresh }: WorktreeCardProps) {
   const [loading, setLoading] = useState(false);
   const [showEnv, setShowEnv] = useState(false);
+  const pendingRef = useRef(false);
 
   async function handleStart() {
+    if (pendingRef.current) return;
+    pendingRef.current = true;
     setLoading(true);
     try {
       await fetch(`/api/worktrees/${worktree.taskNo}/start`, {
@@ -22,16 +25,20 @@ export function WorktreeCard({ worktree, onRefresh }: WorktreeCardProps) {
       });
       onRefresh();
     } finally {
+      pendingRef.current = false;
       setLoading(false);
     }
   }
 
   async function handleStop() {
+    if (pendingRef.current) return;
+    pendingRef.current = true;
     setLoading(true);
     try {
       await fetch(`/api/worktrees/${worktree.taskNo}/stop`, { method: "POST" });
       onRefresh();
     } finally {
+      pendingRef.current = false;
       setLoading(false);
     }
   }

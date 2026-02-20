@@ -5,13 +5,14 @@ import { useLogViewer } from "@/components/terminal/useLogViewer";
 
 interface LogsTabViewProps {
   taskNo: string;
-  status: "running" | "stopped";
+  status: "running" | "stopped" | "installing";
 }
 
 export function LogsTabView({ taskNo, status }: LogsTabViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const { refit, clear, noLogFile } = useLogViewer(containerRef, taskNo);
   const [restarting, setRestarting] = useState(false);
+  const restartingRef = useRef(false);
 
   useEffect(() => {
     const timer = setTimeout(refit, 50);
@@ -19,6 +20,8 @@ export function LogsTabView({ taskNo, status }: LogsTabViewProps) {
   }, [refit]);
 
   async function handleRestart() {
+    if (restartingRef.current) return;
+    restartingRef.current = true;
     setRestarting(true);
     try {
       await fetch(`/api/worktrees/${taskNo}/stop`, { method: "POST" });
@@ -26,6 +29,7 @@ export function LogsTabView({ taskNo, status }: LogsTabViewProps) {
       await new Promise((r) => setTimeout(r, 1000));
       await fetch(`/api/worktrees/${taskNo}/start`, { method: "POST" });
     } finally {
+      restartingRef.current = false;
       setRestarting(false);
     }
   }

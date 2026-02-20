@@ -3,6 +3,9 @@ import { readJson } from "@/lib/store";
 import {
   readWorktreeEnv,
   writeWorktreeEnv,
+  readMainRepoEnv,
+  readEnvTemplate,
+  generateEnv,
   parseEnv,
   serializeEnv,
   type EnvEntry,
@@ -51,6 +54,24 @@ export async function PUT(
     }
 
     const body = await request.json();
+
+    // Apply template mode
+    if (body.applyTemplate) {
+      const mainEnv = readMainRepoEnv();
+      if (!mainEnv) {
+        return NextResponse.json({ error: "Main repo .env not found" }, { status: 404 });
+      }
+      const template = readEnvTemplate();
+      const vars = {
+        PORT: String(worktree.port),
+        BRANCH: worktree.branch,
+        TASK_NO: worktree.taskNo,
+        WORKTREE_PATH: worktree.path,
+      };
+      const generated = generateEnv(mainEnv.entries, template.overrides, vars);
+      writeWorktreeEnv(worktree.path, generated);
+      return NextResponse.json({ ok: true, entries: generated });
+    }
 
     if (body.raw !== undefined) {
       // Raw string mode

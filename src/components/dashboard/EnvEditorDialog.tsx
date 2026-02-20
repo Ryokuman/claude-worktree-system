@@ -146,6 +146,31 @@ export function EnvEditorDialog({
     setTplDirty(true);
   }
 
+  // Apply template to this worktree
+  async function handleApplyTemplate() {
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/worktrees/${taskNo}/env`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ applyTemplate: true }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data.error || "Failed to apply template");
+        return;
+      }
+      if (data.entries) {
+        setEntries(data.entries);
+        setRaw(toRaw(data.entries));
+      }
+      setExists(true);
+      setDirty(false);
+    } finally {
+      setSaving(false);
+    }
+  }
+
   // Load from main repo
   async function handleLoadFromMain() {
     const res = await fetch("/api/env/template");
@@ -363,13 +388,22 @@ export function EnvEditorDialog({
         {/* Footer */}
         <div className="flex items-center justify-between mt-4">
           {mode !== "template" ? (
-            <button
-              onClick={handleLoadFromMain}
-              disabled={isLoading}
-              className="glass-button rounded-lg px-3 py-2 text-xs text-gray-300 hover:text-gray-100 disabled:opacity-50"
-            >
-              Load from main repo
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={handleApplyTemplate}
+                disabled={isLoading || saving}
+                className="glass-button-primary rounded-lg px-3 py-2 text-xs font-medium text-white disabled:opacity-50"
+              >
+                Apply template
+              </button>
+              <button
+                onClick={handleLoadFromMain}
+                disabled={isLoading}
+                className="glass-button rounded-lg px-3 py-2 text-xs text-gray-300 hover:text-gray-100 disabled:opacity-50"
+              >
+                Load from main repo
+              </button>
+            </div>
           ) : (
             <span className="text-xs text-gray-600">전역 설정 (모든 워크트리에 적용)</span>
           )}

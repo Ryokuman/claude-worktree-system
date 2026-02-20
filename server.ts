@@ -346,7 +346,7 @@ app.prepare().then(async () => {
       const allWorktrees = readJson("active.json") as any[];
 
       for (const worktree of allWorktrees) {
-        if (!worktree.port) continue;
+        if (!worktree.port || worktree.status === "installing") continue;
 
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), 5000);

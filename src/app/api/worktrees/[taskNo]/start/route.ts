@@ -5,6 +5,7 @@ import path from "path";
 import { readJson, writeJson } from "@/lib/store";
 import { ensureLogDir, getLogPath } from "@/lib/log-manager";
 import { readWorktreeEnv } from "@/lib/env-generator";
+import { withTaskLock } from "@/lib/task-lock";
 import type { ActiveWorktree } from "@/lib/types";
 
 /** Find PID listening on a given port via lsof. Returns null if not found. */
@@ -35,76 +36,91 @@ export async function POST(
   _request: Request,
   { params }: { params: Promise<{ taskNo: string }> },
 ) {
+  const { taskNo } = await params;
+
   try {
-    const { taskNo } = await params;
-    const active = readJson<ActiveWorktree>("active.json");
-    const worktree = active.find((w) => w.taskNo === taskNo);
-    if (!worktree) throw new Error(`Worktree ${taskNo} not found`);
-    if (worktree.status === "running")
-      throw new Error(`${taskNo} is already running`);
+    return await withTaskLock(taskNo, async () => {
+      // Re-read inside lock to get latest state
+      const active = readJson<ActiveWorktree>("active.json");
+      const worktree = active.find((w) => w.taskNo === taskNo);
+      if (!worktree) throw new Error(`Worktree ${taskNo} not found`);
+      if (worktree.status === "running")
+        throw new Error(`${taskNo} is already running`);
 
-    // Read PORT from worktree's .env file
-    const envEntries = readWorktreeEnv(worktree.path);
-    const portEntry = envEntries?.find((e) => e.key === "PORT");
-    if (portEntry) {
-      const envPort = parseInt(portEntry.value, 10);
-      if (!Number.isNaN(envPort) && envPort !== worktree.port) {
-        worktree.port = envPort;
+      // Read PORT from worktree's .env file
+      const envEntries = readWorktreeEnv(worktree.path);
+      const portEntry = envEntries?.find((e) => e.key === "PORT");
+      if (portEntry) {
+        const envPort = parseInt(portEntry.value, 10);
+        if (!Number.isNaN(envPort) && envPort !== worktree.port) {
+          worktree.port = envPort;
+          writeJson("active.json", active);
+        }
+      }
+
+      if (!worktree.port) {
+        throw new Error(`${taskNo}: PORT not found in .env`);
+      }
+
+      // Check if a process is already running on this port (orphaned process recovery)
+      const existingPid = findPidByPort(worktree.port);
+      if (existingPid) {
+        console.log(`[process] Found existing process on port ${worktree.port} (PID: ${existingPid}), recovering for ${taskNo}`);
+        worktree.status = "running";
+        worktree.pid = existingPid;
         writeJson("active.json", active);
+        return NextResponse.json({ status: "started", taskNo });
       }
-    }
 
-    if (!worktree.port) {
-      throw new Error(`${taskNo}: PORT not found in .env`);
-    }
+      // Install deps if node_modules missing (async to avoid blocking event loop)
+      const nodeModulesPath = path.join(worktree.path, "node_modules");
+      if (!fs.existsSync(nodeModulesPath)) {
+        console.log(`[process] Installing dependencies for ${taskNo}...`);
+        worktree.status = "installing";
+        writeJson("active.json", active);
 
-    // Check if a process is already running on this port (orphaned process recovery)
-    const existingPid = findPidByPort(worktree.port);
-    if (existingPid) {
-      console.log(`[process] Found existing process on port ${worktree.port} (PID: ${existingPid}), recovering for ${taskNo}`);
+        const install = spawn("npm", ["install"], { cwd: worktree.path, stdio: "ignore" });
+        await new Promise<void>((resolve, reject) => {
+          install.on("close", (code) => {
+            if (code === 0) resolve();
+            else reject(new Error(`npm install exited with code ${code}`));
+          });
+          install.on("error", reject);
+        });
+        console.log(`[process] Dependencies installed for ${taskNo}`);
+      }
+
+      // Redirect stdout/stderr to log file via file descriptor
+      ensureLogDir();
+      const logFd = fs.openSync(getLogPath(taskNo), "a");
+
+      // Build env: system vars + worktree .env (worktree values override handler's)
+      const worktreeEnv: Record<string, string> = {};
+      if (envEntries) {
+        for (const e of envEntries) {
+          worktreeEnv[e.key] = e.value;
+        }
+      }
+
+      const child = spawn("npm", ["run", "dev"], {
+        cwd: worktree.path,
+        detached: true,
+        stdio: ["ignore", logFd, logFd],
+        env: { ...process.env, ...worktreeEnv },
+      });
+
+      child.unref();
+      fs.closeSync(logFd);
+
       worktree.status = "running";
-      worktree.pid = existingPid;
+      worktree.pid = child.pid || null;
       writeJson("active.json", active);
+
+      console.log(
+        `[process] Started dev server for ${taskNo} on port ${worktree.port} (PID: ${child.pid})`,
+      );
       return NextResponse.json({ status: "started", taskNo });
-    }
-
-    // Install deps if node_modules missing
-    const nodeModulesPath = path.join(worktree.path, "node_modules");
-    if (!fs.existsSync(nodeModulesPath)) {
-      console.log(`[process] Installing dependencies for ${taskNo}...`);
-      execSync("npm install", { cwd: worktree.path, stdio: "inherit" });
-    }
-
-    // Redirect stdout/stderr to log file via file descriptor
-    ensureLogDir();
-    const logFd = fs.openSync(getLogPath(taskNo), "a");
-
-    // Build env: system vars + worktree .env (worktree values override handler's)
-    const worktreeEnv: Record<string, string> = {};
-    if (envEntries) {
-      for (const e of envEntries) {
-        worktreeEnv[e.key] = e.value;
-      }
-    }
-
-    const child = spawn("npm", ["run", "dev"], {
-      cwd: worktree.path,
-      detached: true,
-      stdio: ["ignore", logFd, logFd],
-      env: { ...process.env, ...worktreeEnv },
     });
-
-    child.unref();
-    fs.closeSync(logFd);
-
-    worktree.status = "running";
-    worktree.pid = child.pid || null;
-    writeJson("active.json", active);
-
-    console.log(
-      `[process] Started dev server for ${taskNo} on port ${worktree.port} (PID: ${child.pid})`,
-    );
-    return NextResponse.json({ status: "started", taskNo });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Unknown error";
     return NextResponse.json({ error: message }, { status: 500 });
