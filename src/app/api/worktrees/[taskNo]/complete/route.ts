@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
+import { execSync } from "child_process";
 import fs from "fs";
 import path from "path";
 import { readJson, writeJson } from "@/lib/store";
 import { stopDevServer } from "@/lib/process-manager";
 import { getServerStatus } from "@/lib/pty-manager";
+import { env } from "@/lib/env";
 import type { ActiveWorktree, EndedWorktree } from "@/lib/types";
 
 const PLAN_DIR = path.resolve(process.cwd(), "plan");
@@ -73,6 +75,18 @@ export async function POST(
       completedAt: new Date().toISOString().split("T")[0],
     });
     writeJson("ended.json", ended);
+
+    // Remove git worktree (디스크에서 삭제 → classifier 재등록 방지)
+    try {
+      execSync(`git worktree remove "${worktree.path}" --force`, {
+        cwd: env.MAIN_REPO_PATH,
+        encoding: "utf-8",
+        stdio: "ignore",
+      });
+      console.log(`[complete] Removed git worktree: ${worktree.path}`);
+    } catch (e) {
+      console.warn(`[complete] Failed to remove git worktree: ${e}`);
+    }
 
     return NextResponse.json({ status: "completed", taskNo });
   } catch (err: unknown) {

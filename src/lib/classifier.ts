@@ -1,7 +1,7 @@
 import { execSync } from "child_process";
 import { extractTaskNo, resetTTNCounter, branchToTaskName } from "./task-utils";
 import { readJson, writeJson } from "./store";
-import type { ActiveWorktree } from "./types";
+import type { ActiveWorktree, EndedWorktree } from "./types";
 import { env } from "./env";
 import type { DeactiveBranch } from "./types";
 
@@ -126,14 +126,17 @@ export function classifyBranches(): void {
       worktreeBranches.add(wt.branch);
     }
 
-    // Auto-register worktrees not in active.json
+    // Auto-register worktrees not in active.json (skip ended ones)
     const active = readJson<ActiveWorktree>("active.json");
+    const ended = readJson<EndedWorktree>("ended.json");
     const activeBranches = new Set(active.map((w) => w.branch));
+    const endedBranches = new Set(ended.map((w) => w.branch));
 
     for (const wt of worktrees) {
       if (!wt.branch) continue;
       if (wt.path === mainRepoPath) continue;
       if (activeBranches.has(wt.branch)) continue;
+      if (endedBranches.has(wt.branch)) continue;
 
       active.push({
         taskNo: extractTaskNo(wt.branch),
