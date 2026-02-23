@@ -191,7 +191,6 @@ export default function DashboardPage() {
                 worktree={wt}
                 selected={false}
                 onSelect={selectWorktree}
-                onRefresh={fetchStatus}
               />
             ))}
           </div>
@@ -301,7 +300,6 @@ export default function DashboardPage() {
               worktree={wt}
               selected={wt.taskNo === selectedTaskNo}
               onSelect={selectWorktree}
-              onRefresh={fetchStatus}
             />
           ))}
         </div>
@@ -332,7 +330,7 @@ export default function DashboardPage() {
           return (
             <div
               key={taskNo}
-              className="absolute inset-0 panel-container h-full"
+              className={`absolute inset-0 panel-container h-full ${isVisible ? "visible" : ""}`}
               style={{ display: isVisible ? "block" : "none" }}
             >
               <WorktreePanel
