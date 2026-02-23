@@ -3,7 +3,7 @@ import fs from "fs";
 import path from "path";
 import { readJson, writeJson } from "@/lib/store";
 import { stopDevServer } from "@/lib/process-manager";
-import { removeLog } from "@/lib/log-manager";
+import { getServerStatus } from "@/lib/pty-manager";
 import type { ActiveWorktree, EndedWorktree } from "@/lib/types";
 
 const PLAN_DIR = path.resolve(process.cwd(), "plan");
@@ -38,8 +38,9 @@ export async function POST(
     }
     const worktree = active[idx];
 
-    // Stop server if running
-    if (worktree.status === "running" && worktree.pid) {
+    // Stop server if running or starting (check PTY state, not stored status)
+    const serverStatus = getServerStatus(taskNo);
+    if (serverStatus !== "stopped") {
       try {
         stopDevServer(taskNo);
       } catch {
@@ -62,9 +63,6 @@ export async function POST(
       }
       fs.rmSync(activeDir, { recursive: true, force: true });
     }
-
-    // Remove log file
-    try { removeLog(worktree.taskNo); } catch {}
 
     // Add to ended
     const ended = readJson<EndedWorktree>("ended.json");

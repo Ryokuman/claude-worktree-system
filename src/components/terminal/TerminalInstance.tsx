@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useEffect } from "react";
-import { useTerminal, type TerminalOptions } from "./useTerminal";
+import { useTerminal } from "./useTerminal";
 
 interface TerminalInstanceProps {
   sessionId: string;
@@ -15,7 +15,11 @@ export function TerminalInstance({
   visible,
 }: TerminalInstanceProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const { refit } = useTerminal(containerRef, { cwd });
+  const { refit } = useTerminal(containerRef, {
+    cwd,
+    sessionId,
+    killOnUnmount: false,
+  });
 
   // Refit when becoming visible
   useEffect(() => {

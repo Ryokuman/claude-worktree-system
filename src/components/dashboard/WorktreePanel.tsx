@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import dynamic from "next/dynamic";
 import type { ActiveWorktree, PanelTab } from "@/lib/types";
 import { PanelTabBar } from "./PanelTabBar";
@@ -30,6 +30,8 @@ const LogsTabView = dynamic(
   { ssr: false },
 );
 
+const STARTING_TIMEOUT_MS = 60_000; // 1분
+
 interface WorktreePanelProps {
   worktree: ActiveWorktree;
   onClose: () => void;
@@ -44,13 +46,73 @@ export function WorktreePanel({
   const [activeTab, setActiveTab] = useState<PanelTab>("plan");
   const [showEnv, setShowEnv] = useState(false);
   const [loading, setLoading] = useState(false);
-  // Track whether terminal tab has been opened at least once
+  const [serverLoading, setServerLoading] = useState(false);
+  const serverPendingRef = useRef(false);
   const [terminalMounted, setTerminalMounted] = useState(false);
+
+  // ── 1분 타임아웃 다이얼로그 ──
+  const [showTimeoutDialog, setShowTimeoutDialog] = useState(false);
+  const startingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const isRunning = worktree.status === "running";
+  const isStarting = worktree.status === "starting";
+
+  const scheduleTimeout = useCallback(() => {
+    if (startingTimerRef.current) clearTimeout(startingTimerRef.current);
+    startingTimerRef.current = setTimeout(() => {
+      setShowTimeoutDialog(true);
+    }, STARTING_TIMEOUT_MS);
+  }, []);
+
+  // starting 상태 감시: 1분 후 타임아웃 다이얼로그
+  useEffect(() => {
+    if (isStarting) {
+      scheduleTimeout();
+    } else {
+      // starting 아니면 타이머 + 다이얼로그 리셋
+      setShowTimeoutDialog(false);
+      if (startingTimerRef.current) {
+        clearTimeout(startingTimerRef.current);
+        startingTimerRef.current = null;
+      }
+    }
+    return () => {
+      if (startingTimerRef.current) clearTimeout(startingTimerRef.current);
+    };
+  }, [isStarting, scheduleTimeout]);
+
+  async function handleKeepSession() {
+    setShowTimeoutDialog(false);
+    // 1분 더 기다림
+    scheduleTimeout();
+  }
+
+  async function handleKillSession() {
+    setShowTimeoutDialog(false);
+    await fetch(`/api/worktrees/${worktree.taskNo}/stop`, { method: "POST" });
+    onRefresh();
+  }
 
   function handleTabChange(tab: PanelTab) {
     setActiveTab(tab);
     if (tab === "terminal") {
       setTerminalMounted(true);
+    }
+  }
+
+  async function handleServerToggle() {
+    if (isStarting || serverPendingRef.current) return;
+    serverPendingRef.current = true;
+    setServerLoading(true);
+    try {
+      const endpoint = isRunning ? "stop" : "start";
+      await fetch(`/api/worktrees/${worktree.taskNo}/${endpoint}`, {
+        method: "POST",
+      });
+      onRefresh();
+    } finally {
+      serverPendingRef.current = false;
+      setServerLoading(false);
     }
   }
 
@@ -78,30 +140,39 @@ export function WorktreePanel({
       {/* Panel Header */}
       <div className="flex items-center justify-between px-5 py-3 border-b border-white/8">
         <div className="flex items-center gap-3 min-w-0">
-          {worktree.status === "running" ? (
+          {isRunning ? (
             <a
               href={`http://localhost:${worktree.port}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="font-mono text-sm font-semibold text-blue-400 hover:text-blue-300 transition-colors"
+              className="font-mono text-sm font-semibold text-blue-400 hover:text-blue-300 transition-colors shrink-0"
               title={`http://localhost:${worktree.port}`}
             >
               {worktree.taskNo}
             </a>
           ) : (
-            <span className="font-mono text-sm font-semibold text-gray-400">
+            <span className="font-mono text-sm font-semibold text-gray-400 shrink-0">
               {worktree.taskNo}
             </span>
           )}
           <span className="text-sm text-gray-300 truncate">
             {worktree.taskName}
           </span>
-          {worktree.status === "running" && (
-            <span className="flex items-center gap-1.5 text-[10px] text-green-400">
-              <span className="h-1.5 w-1.5 rounded-full bg-green-400 animate-pulse" />
-              running
-            </span>
-          )}
+          {/* Server start/stop button */}
+          <button
+            onClick={handleServerToggle}
+            disabled={serverLoading || isStarting}
+            className={`shrink-0 rounded px-2.5 py-1 text-[11px] font-medium disabled:opacity-50 transition-all ${
+              isRunning
+                ? "bg-red-500/20 text-red-300 border border-red-400/30 hover:bg-red-500/30"
+                : isStarting
+                  ? "bg-yellow-500/20 text-yellow-300 border border-yellow-400/30"
+                  : "bg-green-500/20 text-green-300 border border-green-400/30 hover:bg-green-500/30"
+            }`}
+            title={isRunning ? "Stop server" : isStarting ? "Starting..." : "Start server"}
+          >
+            {isRunning ? "■ Stop" : isStarting ? "⏳ Starting" : "▶ Start"}
+          </button>
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <button
@@ -193,6 +264,34 @@ export function WorktreePanel({
           taskName={worktree.taskName}
           onClose={() => setShowEnv(false)}
         />
+      )}
+
+      {/* 서버 응답 없음 다이얼로그 */}
+      {showTimeoutDialog && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/60">
+          <div className="glass-modal rounded-xl px-6 py-5 max-w-sm w-full mx-4 shadow-2xl">
+            <p className="text-sm text-gray-200 mb-4">
+              <span className="font-semibold text-yellow-400">
+                {worktree.taskName}
+              </span>{" "}
+              서버가 응답이 없습니다. 세션을 유지할까요?
+            </p>
+            <div className="flex items-center justify-end gap-3">
+              <button
+                onClick={handleKillSession}
+                className="rounded px-3 py-1.5 text-xs font-medium bg-red-500/20 text-red-300 border border-red-400/30 hover:bg-red-500/30 transition-colors"
+              >
+                종료
+              </button>
+              <button
+                onClick={handleKeepSession}
+                className="rounded px-3 py-1.5 text-xs font-medium bg-blue-500/20 text-blue-300 border border-blue-400/30 hover:bg-blue-500/30 transition-colors"
+              >
+                유지
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

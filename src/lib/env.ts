@@ -8,7 +8,7 @@ export const env = {
   PORT_RANGE_START: parseInt(process.env.PORT_RANGE_START || "3001", 10),
   PORT_RANGE_END: parseInt(process.env.PORT_RANGE_END || "3099", 10),
   HEALTHCHECK_INTERVAL: parseInt(
-    process.env.HEALTHCHECK_INTERVAL || "10000",
+    process.env.HEALTHCHECK_INTERVAL || "20000",
     10
   ),
   HEALTHCHECK_PATH: process.env.HEALTHCHECK_PATH || "/",

@@ -1,11 +1,16 @@
 import { NextResponse } from "next/server";
-import { spawn, execSync } from "child_process";
+import { execSync } from "child_process";
 import fs from "fs";
 import path from "path";
 import { readJson, writeJson } from "@/lib/store";
-import { ensureLogDir, getLogPath } from "@/lib/log-manager";
 import { readWorktreeEnv } from "@/lib/env-generator";
 import { withTaskLock } from "@/lib/task-lock";
+import {
+  createSession,
+  getServerSession,
+  getServerStatus,
+  destroySession,
+} from "@/lib/pty-manager";
 import type { ActiveWorktree } from "@/lib/types";
 
 /** Find PID listening on a given port via lsof. Returns null if not found. */
@@ -23,14 +28,11 @@ function findPidByPort(port: number): number | null {
 /**
  * POST /api/worktrees/:taskNo/start
  *
- * 워크트리의 개발 서버를 시작한다. (A8)
- * npm install (node_modules 없으면) → npm run dev spawn
- * PORT는 워크트리 .env 파일에서 읽어 active.json에 반영
+ * 워크트리의 개발 서버를 시작한다.
+ * PTY 세션을 생성하고 npm run dev를 실행.
+ * starting/running 상태에서는 중복 시작 방지.
  *
  * Params: taskNo - 워크트리 식별자 (e.g. "DV-494", "TTN-1")
- *
- * Response 200: { status: "started", taskNo: string }
- * Response 500: { error: string }
  */
 export async function POST(
   _request: Request,
@@ -40,12 +42,18 @@ export async function POST(
 
   try {
     return await withTaskLock(taskNo, async () => {
-      // Re-read inside lock to get latest state
       const active = readJson<ActiveWorktree>("active.json");
       const worktree = active.find((w) => w.taskNo === taskNo);
       if (!worktree) throw new Error(`Worktree ${taskNo} not found`);
-      if (worktree.status === "running")
+
+      // Check PTY state (source of truth) instead of active.json status
+      const currentStatus = getServerStatus(taskNo);
+      if (currentStatus === "running") {
         throw new Error(`${taskNo} is already running`);
+      }
+      if (currentStatus === "starting") {
+        throw new Error(`${taskNo} is already starting`);
+      }
 
       // Read PORT from worktree's .env file
       const envEntries = readWorktreeEnv(worktree.path);
@@ -66,59 +74,46 @@ export async function POST(
       const existingPid = findPidByPort(worktree.port);
       if (existingPid) {
         console.log(`[process] Found existing process on port ${worktree.port} (PID: ${existingPid}), recovering for ${taskNo}`);
-        worktree.status = "running";
         worktree.pid = existingPid;
         writeJson("active.json", active);
         return NextResponse.json({ status: "started", taskNo });
       }
 
-      // Install deps if node_modules missing (async to avoid blocking event loop)
+      // Destroy any leftover dead PTY session
+      const existingSession = getServerSession(taskNo);
+      if (existingSession) {
+        destroySession(`server-${taskNo}`);
+      }
+
+      // Determine command: install deps if needed, then start dev server
       const nodeModulesPath = path.join(worktree.path, "node_modules");
-      if (!fs.existsSync(nodeModulesPath)) {
-        console.log(`[process] Installing dependencies for ${taskNo}...`);
-        worktree.status = "installing";
-        writeJson("active.json", active);
+      const needsInstall = !fs.existsSync(nodeModulesPath);
+      const command = needsInstall
+        ? "npm install && npm run dev"
+        : "npm run dev";
 
-        const install = spawn("npm", ["install"], { cwd: worktree.path, stdio: "ignore" });
-        await new Promise<void>((resolve, reject) => {
-          install.on("close", (code) => {
-            if (code === 0) resolve();
-            else reject(new Error(`npm install exited with code ${code}`));
-          });
-          install.on("error", reject);
-        });
-        console.log(`[process] Dependencies installed for ${taskNo}`);
+      if (needsInstall) {
+        console.log(`[process] Will install dependencies for ${taskNo}...`);
       }
 
-      // Redirect stdout/stderr to log file via file descriptor
-      ensureLogDir();
-      const logFd = fs.openSync(getLogPath(taskNo), "a");
-
-      // Build env: system vars + worktree .env (worktree values override handler's)
-      const worktreeEnv: Record<string, string> = {};
-      if (envEntries) {
-        for (const e of envEntries) {
-          worktreeEnv[e.key] = e.value;
-        }
-      }
-
-      const child = spawn("npm", ["run", "dev"], {
+      // Create PTY session with clean shell environment
+      // No process.env spread → prevents __NEXT_PRIVATE_* contamination
+      // Status is derived from PTY state: "starting" until HTTP health check responds
+      const session = await createSession({
+        sessionId: `server-${taskNo}`,
         cwd: worktree.path,
-        detached: true,
-        stdio: ["ignore", logFd, logFd],
-        env: { ...process.env, ...worktreeEnv },
+        type: "server",
+        taskNo,
+        initialCommand: command,
       });
 
-      child.unref();
-      fs.closeSync(logFd);
-
-      worktree.status = "running";
-      worktree.pid = child.pid || null;
+      // Store PID and startedAt in active.json (terminal info only)
+      worktree.pid = session.pty.pid;
       worktree.startedAt = new Date().toISOString();
       writeJson("active.json", active);
 
       console.log(
-        `[process] Started dev server for ${taskNo} on port ${worktree.port} (PID: ${child.pid})`,
+        `[process] Started dev server for ${taskNo} on port ${worktree.port} (PID: ${session.pty.pid})`,
       );
       return NextResponse.json({ status: "started", taskNo });
     });

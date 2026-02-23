@@ -8,6 +8,9 @@ import "@xterm/xterm/css/xterm.css";
 export interface TerminalOptions {
   cwd?: string;
   initialCommand?: string;
+  sessionId?: string;
+  killOnUnmount?: boolean;
+  readOnly?: boolean;
 }
 
 export interface TerminalControls {
@@ -61,41 +64,47 @@ export function useTerminal(
     let reconnectCount = 0;
     let isFirstConnect = true;
     let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
-    const sessionId = generateId();
+
+    const sessionId = options.sessionId ?? generateId();
+    const isReadOnly = options.readOnly ?? false;
+    const shouldKillOnUnmount = options.killOnUnmount ?? true;
+    const isServerSession = sessionId.startsWith("server-");
 
     const term = new Terminal({
-      cursorBlink: true,
-      fontSize: 14,
+      cursorBlink: !isReadOnly,
+      disableStdin: isReadOnly,
+      cursorInactiveStyle: isReadOnly ? "none" : undefined,
+      fontSize: isReadOnly ? 13 : 14,
       fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
-      macOptionIsMeta: true,
+      macOptionIsMeta: !isReadOnly,
+      convertEol: isReadOnly,
       theme: {
         background: "#0a0a0a",
         foreground: "#e5e5e5",
-        cursor: "#e5e5e5",
+        cursor: isReadOnly ? "transparent" : "#e5e5e5",
         selectionBackground: "#3b82f680",
       },
     });
 
-    // Mac keyboard shortcuts → terminal sequences
-    term.attachCustomKeyEventHandler((e) => {
-      if (e.type !== "keydown") return true;
-      // Cmd+Backspace → Ctrl+U (delete line)
-      if (e.metaKey && e.key === "Backspace") {
-        term.input("\x15");
-        return false;
-      }
-      // Cmd+← → Ctrl+A (beginning of line)
-      if (e.metaKey && e.key === "ArrowLeft") {
-        term.input("\x01");
-        return false;
-      }
-      // Cmd+→ → Ctrl+E (end of line)
-      if (e.metaKey && e.key === "ArrowRight") {
-        term.input("\x05");
-        return false;
-      }
-      return true;
-    });
+    // Mac keyboard shortcuts → terminal sequences (only for interactive terminals)
+    if (!isReadOnly) {
+      term.attachCustomKeyEventHandler((e) => {
+        if (e.type !== "keydown") return true;
+        if (e.metaKey && e.key === "Backspace") {
+          term.input("\x15");
+          return false;
+        }
+        if (e.metaKey && e.key === "ArrowLeft") {
+          term.input("\x01");
+          return false;
+        }
+        if (e.metaKey && e.key === "ArrowRight") {
+          term.input("\x05");
+          return false;
+        }
+        return true;
+      });
+    }
 
     const fitAddon = new FitAddon();
     fitAddonRef.current = fitAddon;
@@ -115,12 +124,14 @@ export function useTerminal(
     });
     resizeObserver.observe(container);
 
-    // User input → WebSocket
-    term.onData((data) => {
-      if (currentWs && currentWs.readyState === WebSocket.OPEN) {
-        currentWs.send(data);
-      }
-    });
+    // User input → WebSocket (only for interactive terminals)
+    if (!isReadOnly) {
+      term.onData((data) => {
+        if (currentWs && currentWs.readyState === WebSocket.OPEN) {
+          currentWs.send(data);
+        }
+      });
+    }
 
     function connect() {
       if (disposed) return;
@@ -130,6 +141,9 @@ export function useTerminal(
       if (options.cwd) params.set("cwd", options.cwd);
       if (isFirstConnect && options.initialCommand) {
         params.set("initialCommand", options.initialCommand);
+      }
+      if (isServerSession) {
+        params.set("mode", "server");
       }
       isFirstConnect = false;
 
@@ -174,12 +188,16 @@ export function useTerminal(
 
       ws.onclose = () => {
         if (disposed || gotPtyExit) return;
-        term.write("\r\n\x1b[33m[Connection lost]\x1b[0m");
+        if (!isReadOnly) {
+          term.write("\r\n\x1b[33m[Connection lost]\x1b[0m");
+        }
         if (reconnectCount < MAX_RECONNECT) {
           reconnectCount++;
-          term.write(` \x1b[36m(reconnecting ${reconnectCount}/${MAX_RECONNECT}...)\x1b[0m\r\n`);
+          if (!isReadOnly) {
+            term.write(` \x1b[36m(reconnecting ${reconnectCount}/${MAX_RECONNECT}...)\x1b[0m\r\n`);
+          }
           reconnectTimer = setTimeout(() => connect(), RECONNECT_DELAY);
-        } else {
+        } else if (!isReadOnly) {
           term.write(
             `\r\n\x1b[90m[Reconnect failed — close and reopen terminal]\x1b[0m\r\n`,
           );
@@ -195,8 +213,8 @@ export function useTerminal(
       cancelAnimationFrame(rafId);
       resizeObserver.disconnect();
       fitAddonRef.current = null;
-      // Tell server to kill PTY session
-      if (currentWs && currentWs.readyState === WebSocket.OPEN) {
+      // Only send kill if killOnUnmount is true (default for terminal sessions)
+      if (shouldKillOnUnmount && currentWs && currentWs.readyState === WebSocket.OPEN) {
         currentWs.send(JSON.stringify({ type: "kill" }));
       }
       if (currentWs) currentWs.close();
@@ -204,7 +222,7 @@ export function useTerminal(
       wsRef.current = null;
       term.dispose();
     };
-  }, [containerRef, options.cwd, options.initialCommand]);
+  }, [containerRef, options.cwd, options.initialCommand, options.sessionId, options.readOnly, options.killOnUnmount]);
 
   return { refit, sendData };
 }

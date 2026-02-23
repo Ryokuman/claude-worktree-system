@@ -20,11 +20,11 @@ export function WorktreeCardCompact({
   const pendingRef = useRef(false);
 
   const isRunning = worktree.status === "running";
-  const isInstalling = worktree.status === "installing";
+  const isStarting = worktree.status === "starting";
 
   async function handleToggle(e: React.MouseEvent) {
     e.stopPropagation();
-    if (isInstalling || pendingRef.current) return;
+    if (isStarting || pendingRef.current) return;
     pendingRef.current = true;
     setLoading(true);
     try {
@@ -56,7 +56,7 @@ export function WorktreeCardCompact({
         </span>
         <span className="flex items-center gap-1.5">
           <span
-            className={`h-1.5 w-1.5 rounded-full ${isRunning ? "bg-green-400 animate-pulse" : isInstalling ? "bg-yellow-400 animate-pulse" : "bg-gray-600"}`}
+            className={`h-1.5 w-1.5 rounded-full ${isRunning ? "bg-green-400 animate-pulse" : isStarting ? "bg-yellow-400 animate-pulse" : "bg-gray-600"}`}
           />
         </span>
       </div>
@@ -67,17 +67,17 @@ export function WorktreeCardCompact({
         </span>
         <button
           onClick={handleToggle}
-          disabled={loading || isInstalling}
+          disabled={loading || isStarting}
           className={`rounded px-2 py-0.5 text-[10px] font-medium disabled:opacity-50 transition-all ${
             isRunning
               ? "bg-red-500/20 text-red-300 border border-red-400/30 hover:bg-red-500/30"
-              : isInstalling
+              : isStarting
                 ? "bg-yellow-500/20 text-yellow-300 border border-yellow-400/30"
                 : "bg-green-500/20 text-green-300 border border-green-400/30 hover:bg-green-500/30"
           }`}
-          title={isRunning ? "Stop" : isInstalling ? "Installing..." : "Start"}
+          title={isRunning ? "Stop" : isStarting ? "Starting..." : "Start"}
         >
-          {isRunning ? "■" : isInstalling ? "⏳" : "▶"}
+          {isRunning ? "■" : isStarting ? "⏳" : "▶"}
         </button>
       </div>
     </div>

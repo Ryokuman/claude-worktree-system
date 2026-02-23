@@ -25,6 +25,8 @@ export default function DashboardPage() {
   const [healthChecking, setHealthChecking] = useState(false);
   const [selectedTaskNo, setSelectedTaskNo] = useState<string | null>(null);
   const [panelVisible, setPanelVisible] = useState(false);
+  // Track which panels have been opened (persist across selection changes)
+  const [openedPanels, setOpenedPanels] = useState<Set<string>>(new Set());
 
   const mainSet = useMemo(() => new Set(mainBranches), [mainBranches]);
   const deactiveCount = useMemo(
@@ -33,10 +35,22 @@ export default function DashboardPage() {
   );
   const totalBranches = active.length + deactiveCount;
 
-  const selectedWorktree = useMemo(
-    () => active.find((w) => w.taskNo === selectedTaskNo) ?? null,
-    [active, selectedTaskNo],
+  const activeTaskNos = useMemo(
+    () => new Set(active.map((w) => w.taskNo)),
+    [active],
   );
+
+  // Clean up opened panels for worktrees that no longer exist (completed/removed)
+  useEffect(() => {
+    setOpenedPanels((prev) => {
+      const next = new Set<string>();
+      for (const taskNo of prev) {
+        if (activeTaskNos.has(taskNo)) next.add(taskNo);
+      }
+      if (next.size !== prev.size) return next;
+      return prev;
+    });
+  }, [activeTaskNos]);
 
   const fetchStatus = useCallback(async () => {
     try {
@@ -79,8 +93,13 @@ export default function DashboardPage() {
   }, [fetchStatus]);
 
   function selectWorktree(taskNo: string) {
-    if (selectedTaskNo === taskNo) return;
     setSelectedTaskNo(taskNo);
+    setOpenedPanels((prev) => {
+      if (prev.has(taskNo)) return prev;
+      const next = new Set(prev);
+      next.add(taskNo);
+      return next;
+    });
     requestAnimationFrame(() => setPanelVisible(true));
   }
 
@@ -304,19 +323,26 @@ export default function DashboardPage() {
         </div>
       </aside>
 
-      {/* Right Panel */}
-      <main className="flex-1 overflow-hidden">
-        {selectedWorktree && (
-          <div
-            className={`panel-container h-full ${panelVisible ? "visible" : ""}`}
-          >
-            <WorktreePanel
-              worktree={selectedWorktree}
-              onClose={closePanel}
-              onRefresh={fetchStatus}
-            />
-          </div>
-        )}
+      {/* Right Panel — all opened panels rendered, only selected is visible */}
+      <main className="flex-1 overflow-hidden relative">
+        {Array.from(openedPanels).map((taskNo) => {
+          const wt = active.find((w) => w.taskNo === taskNo);
+          if (!wt) return null;
+          const isVisible = taskNo === selectedTaskNo && panelVisible;
+          return (
+            <div
+              key={taskNo}
+              className="absolute inset-0 panel-container h-full"
+              style={{ display: isVisible ? "block" : "none" }}
+            >
+              <WorktreePanel
+                worktree={wt}
+                onClose={closePanel}
+                onRefresh={fetchStatus}
+              />
+            </div>
+          );
+        })}
       </main>
 
       {showAddDialog && (
