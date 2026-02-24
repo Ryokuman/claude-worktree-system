@@ -123,7 +123,7 @@ export function JiraCliTab() {
       {installed && (
         <div className="space-y-3">
           {([
-            ["server", "Server URL", "https://company.atlassian.net", "Jira > Settings > System > General Configuration > Base URL"],
+            ["server", "Server URL", "https://company.atlassian.net", "브라우저에서 Jira 접속 시 주소창의 URL (https://xxx.atlassian.net)"],
             ["login", "Email", "user@company.com", "Jira 로그인에 사용하는 Atlassian 계정 이메일"],
             ["apiToken", "API Token", hasToken ? "(saved — enter to replace)" : "token", "id.atlassian.com > Security > API tokens > Create"],
             ["projectKey", "Project Key", "PROJ", "Jira 프로젝트 목록에서 Key 컬럼 확인 (예: PROJ, DV)"],
