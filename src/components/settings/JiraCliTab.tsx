@@ -123,12 +123,12 @@ export function JiraCliTab() {
       {installed && (
         <div className="space-y-3">
           {([
-            ["server", "Server URL", "https://company.atlassian.net"],
-            ["login", "Email", "user@company.com"],
-            ["apiToken", "API Token", hasToken ? "(saved — enter to replace)" : "token"],
-            ["projectKey", "Project Key", "PROJ"],
-            ["boardId", "Board ID (optional)", "123"],
-          ] as const).map(([key, label, ph]) => (
+            ["server", "Server URL", "https://company.atlassian.net", "Jira > Settings > System > General Configuration > Base URL"],
+            ["login", "Email", "user@company.com", "Jira 로그인에 사용하는 Atlassian 계정 이메일"],
+            ["apiToken", "API Token", hasToken ? "(saved — enter to replace)" : "token", "id.atlassian.com > Security > API tokens > Create"],
+            ["projectKey", "Project Key", "PROJ", "Jira 프로젝트 목록에서 Key 컬럼 확인 (예: PROJ, DV)"],
+            ["boardId", "Board ID (optional)", "123", "Jira 보드 열면 URL에 /board/123 형태로 표시됨"],
+          ] as const).map(([key, label, ph, hint]) => (
             <div key={key}>
               <label className="block text-xs text-gray-400 mb-1">{label}</label>
               <input
@@ -138,6 +138,7 @@ export function JiraCliTab() {
                 placeholder={ph}
                 className="glass-input w-full rounded-lg px-3 py-2 text-sm text-gray-200 font-mono"
               />
+              <p className="text-[11px] text-gray-600 mt-0.5">{hint}</p>
             </div>
           ))}
 
