@@ -12,6 +12,7 @@ export interface TerminalOptions {
   killOnUnmount?: boolean;
   readOnly?: boolean;
   taskNo?: string;
+  onExit?: (code: number) => void;
 }
 
 export interface TerminalControls {
@@ -181,6 +182,7 @@ export function useTerminal(
               term.write(
                 `\r\n\x1b[33m[Process exited with code ${msg.code ?? 0}]\x1b[0m\r\n`,
               );
+              options.onExit?.(msg.code ?? 0);
               return;
             }
           } catch {
@@ -226,7 +228,7 @@ export function useTerminal(
       wsRef.current = null;
       term.dispose();
     };
-  }, [containerRef, options.cwd, options.initialCommand, options.sessionId, options.readOnly, options.killOnUnmount, options.taskNo]);
+  }, [containerRef, options.cwd, options.initialCommand, options.sessionId, options.readOnly, options.killOnUnmount, options.taskNo, options.onExit]);
 
   return { refit, sendData };
 }

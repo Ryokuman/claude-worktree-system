@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { SettingsTabBar, type SettingsTab } from "./SettingsTabBar";
 import { TerminalInitTab } from "./TerminalInitTab";
+import { JiraCliTab } from "./JiraCliTab";
 
 interface SettingsPanelProps {
   onClose: () => void;
@@ -55,6 +56,14 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
           <div className="p-6 text-sm text-gray-500">
             PR settings (coming soon)
           </div>
+        </div>
+
+        {/* Jira Tab */}
+        <div
+          className="absolute inset-0 overflow-auto"
+          style={{ display: activeTab === "jira" ? "block" : "none" }}
+        >
+          <JiraCliTab />
         </div>
       </div>
     </div>

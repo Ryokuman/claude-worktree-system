@@ -114,3 +114,18 @@ export interface FileDiffData {
   file: string;
   diff: string;
 }
+
+/** Jira CLI */
+export interface JiraCliStatus {
+  installed: boolean;
+  version?: string;
+  configExists: boolean;
+}
+
+export interface JiraCliConfig {
+  server: string;
+  login: string;
+  projectKey: string;
+  installationType: "cloud" | "local";
+  boardId?: string;
+}

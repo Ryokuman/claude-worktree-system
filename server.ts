@@ -157,6 +157,10 @@ app.prepare().then(async () => {
     const { classifyBranches } = await import("./src/lib/classifier");
     const { readJson, writeJson } = await import("./src/lib/store");
     const { startPlanSync } = await import("./src/lib/plan-sync");
+    const { restoreApiToken } = await import("./src/lib/jira-cli");
+
+    // Restore JIRA_API_TOKEN into process.env for terminal sessions
+    restoreApiToken();
 
     // --- Git watcher (inline of initWatcher) ---
     const refsPath = path.join(env.MAIN_REPO_PATH, ".git", "refs");
