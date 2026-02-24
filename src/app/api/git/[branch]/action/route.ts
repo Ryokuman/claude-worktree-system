@@ -31,7 +31,8 @@ export async function POST(
       );
     }
 
-    const output = execSync(`git ${action}`, {
+    const cmd = action === "fetch" ? "git fetch --prune" : `git ${action}`;
+    const output = execSync(cmd, {
       cwd: worktree.path,
       encoding: "utf-8",
       timeout: 30000,

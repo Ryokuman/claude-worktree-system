@@ -52,8 +52,31 @@ app.prepare().then(async () => {
     const { query } = parse(req.url || "", true);
     const sessionId = query.sessionId as string;
     const cwd = (query.cwd as string) || process.env.HOME || "/tmp";
-    const initialCommand = query.initialCommand as string | undefined;
+    const rawInitialCommand = query.initialCommand as string | undefined;
+    const taskNo = query.taskNo as string | undefined;
     const mode = (query.mode as string) || "terminal";
+
+    // Build initialCommand: merge terminal-init config + explicit initialCommand
+    let initialCommand = rawInitialCommand;
+    if (taskNo && mode === "terminal") {
+      try {
+        const initFile = path.join(process.cwd(), "work-trees", "terminal-init.json");
+        if (fs.existsSync(initFile)) {
+          const initData = JSON.parse(fs.readFileSync(initFile, "utf-8"));
+          const defaultCmds: string[] = initData.default || [];
+          const worktreeCmds: string[] = initData[taskNo] || [];
+          const allCmds = [...defaultCmds, ...worktreeCmds];
+          if (allCmds.length > 0) {
+            const joined = allCmds.join(" && ");
+            initialCommand = initialCommand
+              ? `${joined} && ${initialCommand}`
+              : joined;
+          }
+        }
+      } catch {
+        // Ignore init command errors
+      }
+    }
 
     if (!sessionId) {
       ws.send(`\r\n\x1b[31m[Missing sessionId]\x1b[0m\r\n`);

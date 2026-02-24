@@ -7,6 +7,7 @@ import { TerminalBookmarkBar } from "./TerminalBookmarkBar";
 
 interface TerminalTabViewProps {
   cwd: string;
+  taskNo?: string;
 }
 
 let sessionCounter = 0;
@@ -20,7 +21,7 @@ function createSession(name?: string): TerminalSession {
   };
 }
 
-export function TerminalTabView({ cwd }: TerminalTabViewProps) {
+export function TerminalTabView({ cwd, taskNo }: TerminalTabViewProps) {
   // Create initial session synchronously to avoid empty-state flash
   const [sessions, setSessions] = useState<TerminalSession[]>(() => {
     const first = createSession();
@@ -84,6 +85,7 @@ export function TerminalTabView({ cwd }: TerminalTabViewProps) {
             sessionId={session.id}
             cwd={cwd}
             visible={session.id === activeSessionId}
+            taskNo={taskNo}
           />
         ))}
       </div>

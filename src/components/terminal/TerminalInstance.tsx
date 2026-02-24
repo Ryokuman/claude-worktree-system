@@ -7,18 +7,21 @@ interface TerminalInstanceProps {
   sessionId: string;
   cwd: string;
   visible: boolean;
+  taskNo?: string;
 }
 
 export function TerminalInstance({
   sessionId,
   cwd,
   visible,
+  taskNo,
 }: TerminalInstanceProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const { refit } = useTerminal(containerRef, {
     cwd,
     sessionId,
     killOnUnmount: false,
+    taskNo,
   });
 
   // Refit when becoming visible

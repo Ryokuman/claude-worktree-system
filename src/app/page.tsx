@@ -15,6 +15,14 @@ const WorktreePanel = dynamic(
   { ssr: false },
 );
 
+const SettingsPanel = dynamic(
+  () =>
+    import("@/components/settings/SettingsPanel").then(
+      (mod) => mod.SettingsPanel,
+    ),
+  { ssr: false },
+);
+
 export default function DashboardPage() {
   const [active, setActive] = useState<ActiveWorktree[]>([]);
   const [deactive, setDeactive] = useState<DeactiveBranch[]>([]);
@@ -27,6 +35,8 @@ export default function DashboardPage() {
   const [panelVisible, setPanelVisible] = useState(false);
   // Track which panels have been opened (persist across selection changes)
   const [openedPanels, setOpenedPanels] = useState<Set<string>>(new Set());
+  const [showSettings, setShowSettings] = useState(false);
+  const [settingsMounted, setSettingsMounted] = useState(false);
 
   const mainSet = useMemo(() => new Set(mainBranches), [mainBranches]);
   const deactiveCount = useMemo(
@@ -93,6 +103,7 @@ export default function DashboardPage() {
   }, [fetchStatus]);
 
   function selectWorktree(taskNo: string) {
+    setShowSettings(false);
     setSelectedTaskNo(taskNo);
     setOpenedPanels((prev) => {
       if (prev.has(taskNo)) return prev;
@@ -103,6 +114,20 @@ export default function DashboardPage() {
     requestAnimationFrame(() => setPanelVisible(true));
   }
 
+  function openSettings() {
+    setShowSettings(true);
+    setSettingsMounted(true);
+    setPanelVisible(false);
+  }
+
+  function closeSettings() {
+    setShowSettings(false);
+    // If no worktree was selected, go back to grid view
+    if (!selectedTaskNo) return;
+    // Otherwise show the previously selected worktree panel
+    requestAnimationFrame(() => setPanelVisible(true));
+  }
+
   function closePanel() {
     setPanelVisible(false);
     setTimeout(() => setSelectedTaskNo(null), 300);
@@ -110,13 +135,17 @@ export default function DashboardPage() {
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape" && selectedTaskNo) {
-        closePanel();
+      if (e.key === "Escape") {
+        if (showSettings) {
+          closeSettings();
+        } else if (selectedTaskNo) {
+          closePanel();
+        }
       }
     }
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [selectedTaskNo]);
+  }, [selectedTaskNo, showSettings]);
 
   if (loading) {
     return (
@@ -126,10 +155,10 @@ export default function DashboardPage() {
     );
   }
 
-  const hasSelection = selectedTaskNo !== null;
+  const hasView = selectedTaskNo !== null || showSettings;
 
-  // ── No selection: centered grid layout ──
-  if (!hasSelection) {
+  // ── No selection & no settings: centered grid layout ──
+  if (!hasView) {
     return (
       <div className="max-w-5xl mx-auto px-4 py-8">
         {/* Wide header */}
@@ -203,12 +232,20 @@ export default function DashboardPage() {
           >
             + Add
           </button>
-          <Link
-            href="/ended"
-            className="text-sm text-gray-500 hover:text-gray-300 transition-colors"
-          >
-            Ended
-          </Link>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={openSettings}
+              className="text-sm text-gray-500 hover:text-gray-300 transition-colors"
+            >
+              Settings
+            </button>
+            <Link
+              href="/ended"
+              className="text-sm text-gray-500 hover:text-gray-300 transition-colors"
+            >
+              Ended
+            </Link>
+          </div>
         </div>
 
         <div className="mt-6 text-xs text-gray-600 flex gap-4">
@@ -312,21 +349,45 @@ export default function DashboardPage() {
           >
             + Add
           </button>
-          <Link
-            href="/ended"
-            className="text-xs text-gray-500 hover:text-gray-300 transition-colors"
-          >
-            Ended
-          </Link>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={openSettings}
+              className={`text-xs transition-colors ${
+                showSettings
+                  ? "text-blue-400"
+                  : "text-gray-500 hover:text-gray-300"
+              }`}
+              title="Settings"
+            >
+              Settings
+            </button>
+            <Link
+              href="/ended"
+              className="text-xs text-gray-500 hover:text-gray-300 transition-colors"
+            >
+              Ended
+            </Link>
+          </div>
         </div>
       </aside>
 
       {/* Right Panel — all opened panels rendered, only selected is visible */}
       <main className="flex-1 overflow-hidden relative">
+        {/* Settings Panel — mounted once, hidden when not active */}
+        {settingsMounted && (
+          <div
+            className="absolute inset-0 h-full"
+            style={{ display: showSettings ? "block" : "none" }}
+          >
+            <SettingsPanel onClose={closeSettings} />
+          </div>
+        )}
+
+        {/* Worktree Panels */}
         {Array.from(openedPanels).map((taskNo) => {
           const wt = active.find((w) => w.taskNo === taskNo);
           if (!wt) return null;
-          const isVisible = taskNo === selectedTaskNo && panelVisible;
+          const isVisible = taskNo === selectedTaskNo && panelVisible && !showSettings;
           return (
             <div
               key={taskNo}

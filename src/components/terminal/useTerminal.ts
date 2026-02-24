@@ -11,6 +11,7 @@ export interface TerminalOptions {
   sessionId?: string;
   killOnUnmount?: boolean;
   readOnly?: boolean;
+  taskNo?: string;
 }
 
 export interface TerminalControls {
@@ -142,6 +143,9 @@ export function useTerminal(
       if (isFirstConnect && options.initialCommand) {
         params.set("initialCommand", options.initialCommand);
       }
+      if (isFirstConnect && options.taskNo) {
+        params.set("taskNo", options.taskNo);
+      }
       if (isServerSession) {
         params.set("mode", "server");
       }
@@ -222,7 +226,7 @@ export function useTerminal(
       wsRef.current = null;
       term.dispose();
     };
-  }, [containerRef, options.cwd, options.initialCommand, options.sessionId, options.readOnly, options.killOnUnmount]);
+  }, [containerRef, options.cwd, options.initialCommand, options.sessionId, options.readOnly, options.killOnUnmount, options.taskNo]);
 
   return { refit, sendData };
 }
