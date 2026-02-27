@@ -33,6 +33,8 @@ export interface PtySession {
   cleanupTimer: ReturnType<typeof setTimeout> | null;
   type: SessionType;
   taskNo: string | null;
+  /** Display name for terminal tabs (e.g. "Terminal 1") */
+  name: string | null;
   /** Timestamp when session was created (Date.now()) */
   startedAt: number;
   /** Whether HTTP health check confirmed server is responding */
@@ -44,6 +46,7 @@ export interface CreateSessionOpts {
   cwd: string;
   type: SessionType;
   taskNo?: string;
+  name?: string;
   initialCommand?: string;
 }
 
@@ -148,6 +151,7 @@ export async function createSession(opts: CreateSessionOpts): Promise<PtySession
     cleanupTimer: null,
     type: opts.type,
     taskNo: opts.taskNo ?? null,
+    name: opts.name ?? null,
     startedAt: Date.now(),
     serverReady: false,
   };
@@ -220,6 +224,20 @@ export function destroySession(sessionId: string): void {
 
 export function destroyServerSession(taskNo: string): void {
   destroySession(`server-${taskNo}`);
+}
+
+// ── Terminal session lookup by taskNo ──
+
+export function getTerminalSessionsForTask(
+  taskNo: string,
+): { sessionId: string; name: string | null; alive: boolean }[] {
+  const result: { sessionId: string; name: string | null; alive: boolean }[] = [];
+  for (const [id, s] of sessions) {
+    if (s.type === "terminal" && s.taskNo === taskNo) {
+      result.push({ sessionId: id, name: s.name, alive: s.alive });
+    }
+  }
+  return result;
 }
 
 // ── Viewer management ──

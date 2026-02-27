@@ -54,24 +54,42 @@ app.prepare().then(async () => {
     const cwd = (query.cwd as string) || process.env.HOME || "/tmp";
     const rawInitialCommand = query.initialCommand as string | undefined;
     const taskNo = query.taskNo as string | undefined;
+    const sessionName = query.name as string | undefined;
     const mode = (query.mode as string) || "terminal";
 
-    // Build initialCommand: merge terminal-init config + explicit initialCommand
+    // Build initialCommand: merge git-auth SSH + terminal-init config + explicit initialCommand
     let initialCommand = rawInitialCommand;
     if (taskNo && mode === "terminal") {
       try {
+        const allCmds: string[] = [];
+
+        // Git auth: prepend ssh-add command if configured
+        try {
+          const gitConfigFile = path.join(process.cwd(), "work-trees", "git-config.json");
+          if (fs.existsSync(gitConfigFile)) {
+            const gitConfig = JSON.parse(fs.readFileSync(gitConfigFile, "utf-8"));
+            if (gitConfig.sshKeyPath) {
+              allCmds.push(`ssh-add ${gitConfig.sshKeyPath} 2>/dev/null`);
+            }
+          }
+        } catch {
+          // Ignore git config errors
+        }
+
+        // Terminal init commands
         const initFile = path.join(process.cwd(), "work-trees", "terminal-init.json");
         if (fs.existsSync(initFile)) {
           const initData = JSON.parse(fs.readFileSync(initFile, "utf-8"));
           const defaultCmds: string[] = initData.default || [];
           const worktreeCmds: string[] = initData[taskNo] || [];
-          const allCmds = [...defaultCmds, ...worktreeCmds];
-          if (allCmds.length > 0) {
-            const joined = allCmds.join(" && ");
-            initialCommand = initialCommand
-              ? `${joined} && ${initialCommand}`
-              : joined;
-          }
+          allCmds.push(...defaultCmds, ...worktreeCmds);
+        }
+
+        if (allCmds.length > 0) {
+          const joined = allCmds.join(" && ");
+          initialCommand = initialCommand
+            ? `${joined} && ${initialCommand}`
+            : joined;
         }
       } catch {
         // Ignore init command errors
@@ -100,6 +118,8 @@ app.prepare().then(async () => {
           sessionId,
           cwd,
           type: "terminal",
+          taskNo,
+          name: sessionName,
           initialCommand,
         });
       } catch (e) {
@@ -158,9 +178,11 @@ app.prepare().then(async () => {
     const { readJson, writeJson } = await import("./src/lib/store");
     const { startPlanSync } = await import("./src/lib/plan-sync");
     const { restoreApiToken } = await import("./src/lib/jira-cli");
+    const { restoreGitToken } = await import("./src/lib/git-auth");
 
-    // Restore JIRA_API_TOKEN into process.env for terminal sessions
+    // Restore tokens into process.env for terminal sessions
     restoreApiToken();
+    restoreGitToken();
 
     // --- Git watcher (inline of initWatcher) ---
     const refsPath = path.join(env.MAIN_REPO_PATH, ".git", "refs");

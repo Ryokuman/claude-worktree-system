@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import type { TerminalSession } from "@/lib/types";
 import { TerminalInstance } from "@/components/terminal/TerminalInstance";
 import { TerminalBookmarkBar } from "./TerminalBookmarkBar";
@@ -12,7 +12,7 @@ interface TerminalTabViewProps {
 
 let sessionCounter = 0;
 
-function createSession(name?: string): TerminalSession {
+function createLocalSession(name?: string): TerminalSession {
   sessionCounter++;
   return {
     id: `term-${Date.now()}-${sessionCounter}`,
@@ -22,17 +22,70 @@ function createSession(name?: string): TerminalSession {
 }
 
 export function TerminalTabView({ cwd, taskNo }: TerminalTabViewProps) {
-  // Create initial session synchronously to avoid empty-state flash
-  const [sessions, setSessions] = useState<TerminalSession[]>(() => {
-    const first = createSession();
-    return [first];
-  });
-  const [activeSessionId, setActiveSessionId] = useState<string | null>(
-    () => sessions[0]?.id ?? null,
-  );
+  const [sessions, setSessions] = useState<TerminalSession[]>([]);
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
+  const [restored, setRestored] = useState(false);
+
+  // On mount: try to restore existing sessions from server
+  useEffect(() => {
+    if (!taskNo) {
+      // No taskNo — create a local session immediately
+      const first = createLocalSession();
+      setSessions([first]);
+      setActiveSessionId(first.id);
+      setRestored(true);
+      return;
+    }
+
+    let cancelled = false;
+
+    async function restore() {
+      try {
+        const res = await fetch(`/api/terminal-sessions?taskNo=${taskNo}`);
+        if (!res.ok) throw new Error("fetch failed");
+        const data = await res.json();
+        const serverSessions: { sessionId: string; name: string | null; alive: boolean }[] =
+          data.sessions ?? [];
+
+        if (cancelled) return;
+
+        // Filter to alive sessions only
+        const aliveSessions = serverSessions.filter((s) => s.alive);
+
+        if (aliveSessions.length > 0) {
+          // Restore from server
+          const restored: TerminalSession[] = aliveSessions.map((s, i) => ({
+            id: s.sessionId,
+            name: s.name ?? `Terminal ${i + 1}`,
+            createdAt: Date.now(),
+          }));
+          setSessions(restored);
+          setActiveSessionId(restored[0].id);
+        } else {
+          // No existing sessions — create new
+          const first = createLocalSession();
+          setSessions([first]);
+          setActiveSessionId(first.id);
+        }
+      } catch {
+        // API error — create new session
+        if (!cancelled) {
+          const first = createLocalSession();
+          setSessions([first]);
+          setActiveSessionId(first.id);
+        }
+      }
+      if (!cancelled) setRestored(true);
+    }
+
+    restore();
+    return () => {
+      cancelled = true;
+    };
+  }, [taskNo]);
 
   const handleAdd = useCallback(() => {
-    const newSession = createSession();
+    const newSession = createLocalSession();
     setSessions((prev) => [...prev, newSession]);
     setActiveSessionId(newSession.id);
   }, []);
@@ -62,6 +115,11 @@ export function TerminalTabView({ cwd, taskNo }: TerminalTabViewProps) {
     setActiveSessionId(id);
   }, []);
 
+  // Show nothing until restore attempt completes (prevents flash)
+  if (!restored) {
+    return null;
+  }
+
   if (sessions.length === 0) {
     return (
       <div className="flex items-center justify-center h-full w-full">
@@ -86,6 +144,7 @@ export function TerminalTabView({ cwd, taskNo }: TerminalTabViewProps) {
             cwd={cwd}
             visible={session.id === activeSessionId}
             taskNo={taskNo}
+            sessionName={session.name}
           />
         ))}
       </div>

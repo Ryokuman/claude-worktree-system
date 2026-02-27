@@ -9,6 +9,7 @@ export interface TerminalOptions {
   cwd?: string;
   initialCommand?: string;
   sessionId?: string;
+  sessionName?: string;
   killOnUnmount?: boolean;
   readOnly?: boolean;
   taskNo?: string;
@@ -147,6 +148,9 @@ export function useTerminal(
       if (isFirstConnect && options.taskNo) {
         params.set("taskNo", options.taskNo);
       }
+      if (isFirstConnect && options.sessionName) {
+        params.set("name", options.sessionName);
+      }
       if (isServerSession) {
         params.set("mode", "server");
       }
@@ -228,7 +232,7 @@ export function useTerminal(
       wsRef.current = null;
       term.dispose();
     };
-  }, [containerRef, options.cwd, options.initialCommand, options.sessionId, options.readOnly, options.killOnUnmount, options.taskNo, options.onExit]);
+  }, [containerRef, options.cwd, options.initialCommand, options.sessionId, options.sessionName, options.readOnly, options.killOnUnmount, options.taskNo, options.onExit]);
 
   return { refit, sendData };
 }
