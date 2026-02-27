@@ -1,6 +1,7 @@
 import { execSync } from "child_process";
 import { extractTaskNo, resetTTNCounter, branchToTaskName } from "./task-utils";
 import { readJson, writeJson } from "./store";
+import { readWorktreeEnv } from "./env-generator";
 import type { ActiveWorktree, EndedWorktree } from "./types";
 import { env } from "./env";
 import type { DeactiveBranch } from "./types";
@@ -138,12 +139,17 @@ export function classifyBranches(): void {
       if (activeBranches.has(wt.branch)) continue;
       if (endedBranches.has(wt.branch)) continue;
 
+      // Read PORT from worktree's .env file
+      const envEntries = readWorktreeEnv(wt.path);
+      const portEntry = envEntries?.find((e) => e.key === "PORT");
+      const port = portEntry ? parseInt(portEntry.value, 10) || 0 : 0;
+
       active.push({
         taskNo: extractTaskNo(wt.branch),
         taskName: branchToTaskName(wt.branch),
         branch: wt.branch,
         path: wt.path,
-        port: 0,
+        port,
         status: "stopped",
         pid: null,
         createdAt: new Date().toISOString().split("T")[0],
@@ -152,6 +158,18 @@ export function classifyBranches(): void {
       console.log(
         `[classifier] Auto-registered existing worktree: ${wt.branch}`,
       );
+    }
+
+    // Sync port from worktree .env for existing active entries
+    for (const w of active) {
+      const envEntries = readWorktreeEnv(w.path);
+      const portEntry = envEntries?.find((e) => e.key === "PORT");
+      if (portEntry) {
+        const envPort = parseInt(portEntry.value, 10);
+        if (!Number.isNaN(envPort) && envPort !== w.port) {
+          w.port = envPort;
+        }
+      }
     }
 
     // Remove active entries whose worktree no longer exists
