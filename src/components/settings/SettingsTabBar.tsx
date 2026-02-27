@@ -1,6 +1,6 @@
 "use client";
 
-export type SettingsTab = "env-template" | "terminal-init" | "pr" | "jira";
+export type SettingsTab = "env-template" | "terminal-init" | "claude-code" | "git" | "pr" | "jira";
 
 interface SettingsTabBarProps {
   activeTab: SettingsTab;
@@ -10,6 +10,8 @@ interface SettingsTabBarProps {
 const TABS: { key: SettingsTab; label: string }[] = [
   { key: "env-template", label: "Env Template" },
   { key: "terminal-init", label: "Terminal Init" },
+  { key: "claude-code", label: "Claude Code" },
+  { key: "git", label: "Git" },
   { key: "pr", label: "PR" },
   { key: "jira", label: "Jira" },
 ];

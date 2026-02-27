@@ -129,3 +129,9 @@ export interface JiraCliConfig {
   installationType: "cloud" | "local";
   boardId?: string;
 }
+
+export interface GitAuthConfig {
+  sshKeyPath: string;
+  provider: "github" | "gitlab" | "bitbucket";
+  username: string;
+}

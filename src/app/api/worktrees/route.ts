@@ -12,6 +12,7 @@ import {
   generateEnv,
   writeWorktreeEnv,
 } from "@/lib/env-generator";
+import { applyToWorktree } from "@/lib/claude-permissions";
 import type { ActiveWorktree, DeactiveBranch } from "@/lib/types";
 
 const PLAN_DIR = path.resolve(process.cwd(), "plan");
@@ -104,6 +105,13 @@ export async function POST(request: Request) {
       };
       const entries = generateEnv(mainEnv.entries, template.overrides, vars);
       writeWorktreeEnv(worktreePath, entries);
+    }
+
+    // Apply Claude Code permissions
+    try {
+      applyToWorktree(taskNo, worktreePath);
+    } catch {
+      // Non-critical: don't fail worktree creation
     }
 
     // Remove from deactive

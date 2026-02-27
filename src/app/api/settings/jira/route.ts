@@ -5,6 +5,7 @@ import {
   writeConfig,
   loadApiToken,
 } from "@/lib/jira-cli";
+import { applyToAllWorktrees } from "@/lib/claude-permissions";
 import type { JiraCliConfig } from "@/lib/types";
 
 /**
@@ -58,6 +59,9 @@ export async function PUT(request: Request) {
       },
       body.apiToken || undefined,
     );
+
+    // Re-apply CLAUDE.md prompt to all worktrees (jira info changed)
+    try { applyToAllWorktrees(); } catch {}
 
     return NextResponse.json({ ok: true });
   } catch (err: unknown) {

@@ -4,6 +4,8 @@ import { useState } from "react";
 import { SettingsTabBar, type SettingsTab } from "./SettingsTabBar";
 import { TerminalInitTab } from "./TerminalInitTab";
 import { JiraCliTab } from "./JiraCliTab";
+import { ClaudeCodeTab } from "./ClaudeCodeTab";
+import { GitTab } from "./GitTab";
 
 interface SettingsPanelProps {
   onClose: () => void;
@@ -46,6 +48,22 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
           style={{ display: activeTab === "terminal-init" ? "block" : "none" }}
         >
           <TerminalInitTab />
+        </div>
+
+        {/* Claude Code Tab */}
+        <div
+          className="absolute inset-0 overflow-auto"
+          style={{ display: activeTab === "claude-code" ? "block" : "none" }}
+        >
+          <ClaudeCodeTab />
+        </div>
+
+        {/* Git Tab */}
+        <div
+          className="absolute inset-0 overflow-auto"
+          style={{ display: activeTab === "git" ? "block" : "none" }}
+        >
+          <GitTab />
         </div>
 
         {/* PR Tab */}
