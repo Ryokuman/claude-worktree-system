@@ -65,6 +65,17 @@ export function hasSshPassphrase(): boolean {
   return fs.existsSync(PASSPHRASE_FILE);
 }
 
+/* ── SSH env for terminal sessions ─────────────────────── */
+
+export function getSshEnv(): Record<string, string> {
+  if (!fs.existsSync(ASKPASS_SCRIPT)) return {};
+  return {
+    SSH_ASKPASS: ASKPASS_SCRIPT,
+    SSH_ASKPASS_REQUIRE: "force",
+    DISPLAY: ":0",
+  };
+}
+
 /* ── SSH command helper ─────────────────────────────────── */
 
 export function getSshAddCommand(): string | null {
@@ -72,9 +83,5 @@ export function getSshAddCommand(): string | null {
   if (!config?.sshKeyPath) return null;
   const keyPath = config.sshKeyPath.replace(/^~/, os.homedir());
   if (!fs.existsSync(keyPath)) return null;
-
-  if (fs.existsSync(ASKPASS_SCRIPT)) {
-    return `SSH_ASKPASS="${ASKPASS_SCRIPT}" SSH_ASKPASS_REQUIRE=force ssh-add ${config.sshKeyPath} 2>/dev/null`;
-  }
   return `ssh-add ${config.sshKeyPath} 2>/dev/null`;
 }

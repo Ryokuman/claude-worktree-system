@@ -18,7 +18,7 @@ import {
   attachViewer,
   detachViewer,
 } from "./src/lib/pty-manager";
-import { getSshAddCommand } from "./src/lib/git-auth";
+import { getSshAddCommand, getSshEnv } from "./src/lib/git-auth";
 
 const dev = process.env.NODE_ENV !== "production";
 const hostname = "localhost";
@@ -117,6 +117,7 @@ app.prepare().then(async () => {
           taskNo,
           name: sessionName,
           initialCommand,
+          extraEnv: getSshEnv(),
         });
       } catch (e) {
         ws.send(`\r\n\x1b[31mFailed to spawn shell: ${e}\x1b[0m\r\n`);

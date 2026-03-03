@@ -48,6 +48,7 @@ export interface CreateSessionOpts {
   taskNo?: string;
   name?: string;
   initialCommand?: string;
+  extraEnv?: Record<string, string>;
 }
 
 // ── Constants ──
@@ -132,7 +133,7 @@ export async function createSession(opts: CreateSessionOpts): Promise<PtySession
   const env =
     opts.type === "server"
       ? buildServerEnv()
-      : ({ ...process.env, TERM: "xterm-256color" } as Record<string, string>);
+      : ({ ...process.env, TERM: "xterm-256color", ...opts.extraEnv } as Record<string, string>);
 
   const ptyProcess = pty.spawn(shell, [], {
     name: "xterm-256color",
