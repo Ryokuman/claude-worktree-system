@@ -76,9 +76,7 @@ export function TerminalInitTab() {
   }
 
   if (loading) {
-    return (
-      <div className="p-6 text-sm text-gray-500">Loading...</div>
-    );
+    return <div className="p-6 text-sm text-gray-500">Loading...</div>;
   }
 
   return (
@@ -98,7 +96,6 @@ export function TerminalInitTab() {
           onChange={(e) => handleChange("default", e.target.value)}
           rows={3}
           className="glass-input w-full rounded-lg px-3 py-2 text-sm text-gray-200 font-mono resize-y"
-          placeholder="ssh-add ~/.ssh/id_ed25519"
         />
         {isDirty("default") && (
           <button
@@ -119,10 +116,7 @@ export function TerminalInitTab() {
           </h3>
           <div className="space-y-4">
             {active.map((wt) => (
-              <div
-                key={wt.taskNo}
-                className="glass-card rounded-lg p-4"
-              >
+              <div key={wt.taskNo} className="glass-card rounded-lg p-4">
                 <div className="flex items-center gap-2 mb-2">
                   <span className="font-mono text-xs font-semibold text-blue-400">
                     {wt.taskNo}

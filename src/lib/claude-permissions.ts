@@ -126,29 +126,10 @@ export function generatePermissionPrompt(taskNo: string): string {
   return lines.join("\n");
 }
 
-function writeClaudeMd(worktreePath: string, prompt: string): void {
-  const claudeMdPath = path.join(worktreePath, "CLAUDE.md");
-
-  let content = "";
-  if (fs.existsSync(claudeMdPath)) {
-    content = fs.readFileSync(claudeMdPath, "utf-8");
-  }
-
-  const startIdx = content.indexOf(MARKER_START);
-  const endIdx = content.indexOf(MARKER_END);
-
-  if (startIdx !== -1 && endIdx !== -1) {
-    // Replace existing section
-    content =
-      content.slice(0, startIdx) +
-      prompt +
-      content.slice(endIdx + MARKER_END.length);
-  } else {
-    // Append to end
-    content = content.trimEnd() + (content ? "\n\n" : "") + prompt + "\n";
-  }
-
-  fs.writeFileSync(claudeMdPath, content, "utf-8");
+function writePermissionsMd(worktreePath: string, prompt: string): void {
+  const claudeDir = path.join(worktreePath, ".claude");
+  fs.mkdirSync(claudeDir, { recursive: true });
+  fs.writeFileSync(path.join(claudeDir, "permissions.md"), prompt + "\n", "utf-8");
 }
 
 /* ── Apply to worktree ──────────────────────────────────── */
@@ -182,9 +163,9 @@ export function applyToWorktree(
     fs.writeFileSync(settingsFile, JSON.stringify(settings, null, 2), "utf-8");
   }
 
-  // Write CLAUDE.md permission prompt
+  // Write .claude/permissions.md prompt
   const prompt = generatePermissionPrompt(taskNo);
-  writeClaudeMd(worktreePath, prompt);
+  writePermissionsMd(worktreePath, prompt);
 }
 
 export function applyToAllWorktrees(): void {

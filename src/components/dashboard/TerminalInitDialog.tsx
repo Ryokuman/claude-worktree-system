@@ -89,7 +89,6 @@ export function TerminalInitDialog({
               onChange={(e) => setCommands(e.target.value)}
               rows={5}
               className="glass-input w-full rounded-lg px-3 py-2 text-sm text-gray-200 font-mono resize-y"
-              placeholder="ssh-add ~/.ssh/id_ed25519"
             />
             <div className="flex items-center justify-end gap-2 mt-4">
               <button

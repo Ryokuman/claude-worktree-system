@@ -5,6 +5,7 @@ import { SettingsTabBar, type SettingsTab } from "./SettingsTabBar";
 import { TerminalInitTab } from "./TerminalInitTab";
 import { JiraCliTab } from "./JiraCliTab";
 import { ClaudeCodeTab } from "./ClaudeCodeTab";
+import { PromptTab } from "./PromptTab";
 import { GitTab } from "./GitTab";
 
 interface SettingsPanelProps {
@@ -56,6 +57,14 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
           style={{ display: activeTab === "claude-code" ? "block" : "none" }}
         >
           <ClaudeCodeTab />
+        </div>
+
+        {/* Prompt Tab */}
+        <div
+          className="absolute inset-0 overflow-auto"
+          style={{ display: activeTab === "prompt" ? "block" : "none" }}
+        >
+          <PromptTab />
         </div>
 
         {/* Git Tab */}
