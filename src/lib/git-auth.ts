@@ -1,6 +1,7 @@
 import fs from "fs";
 import path from "path";
 import os from "os";
+import { execSync } from "child_process";
 import type { GitAuthConfig } from "./types";
 
 const DATA_DIR = path.resolve(process.cwd(), "work-trees");
@@ -54,26 +55,43 @@ export function restoreGitToken(): void {
 
 /* ── SSH passphrase management ─────────────────────────── */
 
+/**
+ * Save passphrase and immediately register the key in macOS Keychain.
+ * Uses SSH_ASKPASS via child_process (no TTY) to provide passphrase,
+ * then stores in Keychain via --apple-use-keychain for permanent access.
+ */
 export function saveSshPassphrase(passphrase: string): void {
   fs.mkdirSync(TOKEN_DIR, { recursive: true });
   fs.writeFileSync(PASSPHRASE_FILE, passphrase, { encoding: "utf-8", mode: 0o600 });
   const script = `#!/bin/sh\ncat "${PASSPHRASE_FILE}"\n`;
   fs.writeFileSync(ASKPASS_SCRIPT, script, { encoding: "utf-8", mode: 0o755 });
+
+  // Immediately register in macOS Keychain via child_process (no TTY → SSH_ASKPASS works)
+  const config = readGitConfig();
+  if (config?.sshKeyPath) {
+    const keyPath = config.sshKeyPath.replace(/^~/, os.homedir());
+    if (fs.existsSync(keyPath)) {
+      try {
+        execSync(`ssh-add --apple-use-keychain "${keyPath}"`, {
+          env: {
+            ...process.env,
+            SSH_ASKPASS: ASKPASS_SCRIPT,
+            SSH_ASKPASS_REQUIRE: "force",
+            DISPLAY: ":0",
+          },
+          stdio: "pipe",
+          timeout: 5000,
+        });
+        console.log("[git-auth] SSH key registered in macOS Keychain");
+      } catch (e) {
+        console.error("[git-auth] Failed to register SSH key in Keychain:", e);
+      }
+    }
+  }
 }
 
 export function hasSshPassphrase(): boolean {
   return fs.existsSync(PASSPHRASE_FILE);
-}
-
-/* ── SSH env for terminal sessions ─────────────────────── */
-
-export function getSshEnv(): Record<string, string> {
-  if (!fs.existsSync(ASKPASS_SCRIPT)) return {};
-  return {
-    SSH_ASKPASS: ASKPASS_SCRIPT,
-    SSH_ASKPASS_REQUIRE: "force",
-    DISPLAY: ":0",
-  };
 }
 
 /* ── SSH command helper ─────────────────────────────────── */
@@ -83,5 +101,5 @@ export function getSshAddCommand(): string | null {
   if (!config?.sshKeyPath) return null;
   const keyPath = config.sshKeyPath.replace(/^~/, os.homedir());
   if (!fs.existsSync(keyPath)) return null;
-  return `ssh-add ${config.sshKeyPath} 2>/dev/null`;
+  return `ssh-add --apple-use-keychain ${config.sshKeyPath} 2>/dev/null`;
 }
