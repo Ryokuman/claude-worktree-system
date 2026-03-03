@@ -7,6 +7,8 @@ const DATA_DIR = path.resolve(process.cwd(), "work-trees");
 const CONFIG_FILE = path.join(DATA_DIR, "git-config.json");
 const TOKEN_DIR = path.join(os.homedir(), ".config", ".git-handler");
 const TOKEN_FILE = path.join(TOKEN_DIR, ".token");
+const PASSPHRASE_FILE = path.join(TOKEN_DIR, ".ssh-passphrase");
+const ASKPASS_SCRIPT = path.join(TOKEN_DIR, "ssh-askpass.sh");
 
 /* ── Config read / write ────────────────────────────────── */
 
@@ -50,13 +52,29 @@ export function restoreGitToken(): void {
   }
 }
 
+/* ── SSH passphrase management ─────────────────────────── */
+
+export function saveSshPassphrase(passphrase: string): void {
+  fs.mkdirSync(TOKEN_DIR, { recursive: true });
+  fs.writeFileSync(PASSPHRASE_FILE, passphrase, { encoding: "utf-8", mode: 0o600 });
+  const script = `#!/bin/sh\ncat "${PASSPHRASE_FILE}"\n`;
+  fs.writeFileSync(ASKPASS_SCRIPT, script, { encoding: "utf-8", mode: 0o755 });
+}
+
+export function hasSshPassphrase(): boolean {
+  return fs.existsSync(PASSPHRASE_FILE);
+}
+
 /* ── SSH command helper ─────────────────────────────────── */
 
 export function getSshAddCommand(): string | null {
   const config = readGitConfig();
   if (!config?.sshKeyPath) return null;
-  // Expand ~ to home dir
   const keyPath = config.sshKeyPath.replace(/^~/, os.homedir());
   if (!fs.existsSync(keyPath)) return null;
+
+  if (fs.existsSync(ASKPASS_SCRIPT)) {
+    return `SSH_ASKPASS="${ASKPASS_SCRIPT}" SSH_ASKPASS_REQUIRE=force ssh-add ${config.sshKeyPath} 2>/dev/null`;
+  }
   return `ssh-add ${config.sshKeyPath} 2>/dev/null`;
 }

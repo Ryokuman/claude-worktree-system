@@ -18,6 +18,7 @@ import {
   attachViewer,
   detachViewer,
 } from "./src/lib/pty-manager";
+import { getSshAddCommand } from "./src/lib/git-auth";
 
 const dev = process.env.NODE_ENV !== "production";
 const hostname = "localhost";
@@ -65,13 +66,8 @@ app.prepare().then(async () => {
 
         // Git auth: prepend ssh-add command if configured
         try {
-          const gitConfigFile = path.join(process.cwd(), "work-trees", "git-config.json");
-          if (fs.existsSync(gitConfigFile)) {
-            const gitConfig = JSON.parse(fs.readFileSync(gitConfigFile, "utf-8"));
-            if (gitConfig.sshKeyPath) {
-              allCmds.push(`ssh-add ${gitConfig.sshKeyPath} 2>/dev/null`);
-            }
-          }
+          const sshCmd = getSshAddCommand();
+          if (sshCmd) allCmds.push(sshCmd);
         } catch {
           // Ignore git config errors
         }

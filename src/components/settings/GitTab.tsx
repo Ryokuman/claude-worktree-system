@@ -6,11 +6,13 @@ import type { GitAuthConfig } from "@/lib/types";
 export function GitTab() {
   const [config, setConfig] = useState<GitAuthConfig | null>(null);
   const [hasToken, setHasToken] = useState(false);
+  const [hasPassphrase, setHasPassphrase] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
   const [form, setForm] = useState({
     sshKeyPath: "",
+    sshPassphrase: "",
     provider: "github" as "github" | "gitlab" | "bitbucket",
     username: "",
     token: "",
@@ -22,6 +24,7 @@ export function GitTab() {
       const data = await res.json();
       setConfig(data.config);
       setHasToken(data.hasToken);
+      setHasPassphrase(data.hasPassphrase);
       if (data.config) {
         setForm((f) => ({
           ...f,
@@ -49,7 +52,7 @@ export function GitTab() {
       });
       if (res.ok) {
         await fetchData();
-        setForm((f) => ({ ...f, token: "" }));
+        setForm((f) => ({ ...f, token: "", sshPassphrase: "" }));
       }
     } finally {
       setSaving(false);
@@ -81,6 +84,21 @@ export function GitTab() {
           />
           <p className="text-[11px] text-gray-600 mt-0.5">
             터미널 시작 시 자동 ssh-add 될 키 경로 (ls ~/.ssh/ 로 확인)
+          </p>
+        </div>
+
+        {/* SSH Passphrase */}
+        <div>
+          <label className="block text-xs text-gray-400 mb-1">SSH Passphrase</label>
+          <input
+            type="password"
+            value={form.sshPassphrase}
+            onChange={(e) => set("sshPassphrase", e.target.value)}
+            placeholder={hasPassphrase ? "(saved — enter to replace)" : "SSH 키 비밀번호"}
+            className="glass-input w-full rounded-lg px-3 py-2 text-sm text-gray-200 font-mono"
+          />
+          <p className="text-[11px] text-gray-600 mt-0.5">
+            SSH 키의 passphrase — 저장하면 터미널에서 비밀번호 입력 없이 ssh-add 자동 실행
           </p>
         </div>
 
