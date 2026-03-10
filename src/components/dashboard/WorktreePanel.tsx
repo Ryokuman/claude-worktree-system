@@ -6,6 +6,7 @@ import type { ActiveWorktree, PanelTab } from "@/lib/types";
 import { PanelTabBar } from "./PanelTabBar";
 import { EnvEditorDialog } from "./EnvEditorDialog";
 import { TerminalInitDialog } from "./TerminalInitDialog";
+import { ApplyTemplateDialog } from "./ApplyTemplateDialog";
 
 const PlanTabView = dynamic(
   () => import("@/components/panel/PlanTabView").then((m) => m.PlanTabView),
@@ -47,6 +48,7 @@ export function WorktreePanel({
   const [activeTab, setActiveTab] = useState<PanelTab>("plan");
   const [showEnv, setShowEnv] = useState(false);
   const [showInit, setShowInit] = useState(false);
+  const [showApplyTemplate, setShowApplyTemplate] = useState(false);
   const [loading, setLoading] = useState(false);
   const [serverLoading, setServerLoading] = useState(false);
   const serverPendingRef = useRef(false);
@@ -201,6 +203,13 @@ export function WorktreePanel({
             init
           </button>
           <button
+            onClick={() => setShowApplyTemplate(true)}
+            className="text-xs text-gray-500 hover:text-blue-400 transition-colors"
+            title="Apply env/mcp templates"
+          >
+            apply
+          </button>
+          <button
             onClick={handleComplete}
             disabled={loading}
             className="glass-button rounded px-2 py-1 text-xs font-medium text-gray-400 hover:text-gray-100 disabled:opacity-50"
@@ -279,6 +288,14 @@ export function WorktreePanel({
           taskNo={worktree.taskNo}
           taskName={worktree.taskName}
           onClose={() => setShowInit(false)}
+        />
+      )}
+
+      {showApplyTemplate && (
+        <ApplyTemplateDialog
+          taskNo={worktree.taskNo}
+          taskName={worktree.taskName}
+          onClose={() => setShowApplyTemplate(false)}
         />
       )}
 

@@ -7,6 +7,9 @@ import { JiraCliTab } from "./JiraCliTab";
 import { ClaudeCodeTab } from "./ClaudeCodeTab";
 import { PromptTab } from "./PromptTab";
 import { GitTab } from "./GitTab";
+import { EnvTemplateTab } from "./EnvTemplateTab";
+import { McpTab } from "./McpTab";
+import { AutoFeedbackTab } from "./AutoFeedbackTab";
 
 interface SettingsPanelProps {
   onClose: () => void;
@@ -38,9 +41,7 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
           className="absolute inset-0 overflow-auto"
           style={{ display: activeTab === "env-template" ? "block" : "none" }}
         >
-          <div className="p-6 text-sm text-gray-500">
-            Env Template settings (coming soon)
-          </div>
+          <EnvTemplateTab />
         </div>
 
         {/* Terminal Init Tab */}
@@ -73,6 +74,22 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
           style={{ display: activeTab === "git" ? "block" : "none" }}
         >
           <GitTab />
+        </div>
+
+        {/* MCP Tab */}
+        <div
+          className="absolute inset-0 overflow-hidden"
+          style={{ display: activeTab === "mcp" ? "flex" : "none" }}
+        >
+          <McpTab />
+        </div>
+
+        {/* Auto Feedback Tab */}
+        <div
+          className="absolute inset-0 overflow-auto"
+          style={{ display: activeTab === "auto-feedback" ? "block" : "none" }}
+        >
+          <AutoFeedbackTab />
         </div>
 
         {/* PR Tab */}

@@ -13,6 +13,7 @@ import {
   writeWorktreeEnv,
 } from "@/lib/env-generator";
 import { applyToWorktree } from "@/lib/claude-permissions";
+import { readMcpConfig, applyMcpToWorktree } from "@/lib/mcp-config";
 import type { ActiveWorktree, DeactiveBranch } from "@/lib/types";
 
 const PLAN_DIR = path.resolve(process.cwd(), "plan");
@@ -110,6 +111,14 @@ export async function POST(request: Request) {
     // Apply Claude Code permissions
     try {
       applyToWorktree(taskNo, worktreePath);
+    } catch {
+      // Non-critical: don't fail worktree creation
+    }
+
+    // Apply MCP configuration
+    try {
+      const mcpConfig = readMcpConfig();
+      applyMcpToWorktree(worktreePath, mcpConfig, port);
     } catch {
       // Non-critical: don't fail worktree creation
     }

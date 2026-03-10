@@ -189,6 +189,13 @@ export function useTerminal(
               options.onExit?.(msg.code ?? 0);
               return;
             }
+            if (msg.type === "pty:feedback-start") {
+              gotPtyExit = false; // Reset so we keep receiving output
+              term.write(
+                `\r\n\x1b[36m[Auto-feedback session started...]\x1b[0m\r\n`,
+              );
+              return;
+            }
           } catch {
             // Not a control message
           }

@@ -110,6 +110,10 @@ app.prepare().then(async () => {
 
       // Create new terminal session
       try {
+        // Detect if this is a Claude Code session for auto-feedback
+        const isClaudeSession = !!(
+          initialCommand && /\bclaude\b/.test(initialCommand)
+        );
         session = await createSession({
           sessionId,
           cwd,
@@ -117,6 +121,7 @@ app.prepare().then(async () => {
           taskNo,
           name: sessionName,
           initialCommand,
+          claudeSession: isClaudeSession,
         });
       } catch (e) {
         ws.send(`\r\n\x1b[31mFailed to spawn shell: ${e}\x1b[0m\r\n`);

@@ -39,6 +39,10 @@ export interface PtySession {
   startedAt: number;
   /** Whether HTTP health check confirmed server is responding */
   serverReady: boolean;
+  /** Whether this session is running Claude Code */
+  claudeSession: boolean;
+  /** Whether auto-feedback has already been triggered for this session */
+  autoFeedbackTriggered: boolean;
 }
 
 export interface CreateSessionOpts {
@@ -49,6 +53,8 @@ export interface CreateSessionOpts {
   name?: string;
   initialCommand?: string;
   extraEnv?: Record<string, string>;
+  /** Mark this session as a Claude Code session for auto-feedback */
+  claudeSession?: boolean;
 }
 
 // ── Constants ──
@@ -74,7 +80,7 @@ async function getPty() {
 
 function buildServerEnv(): Record<string, string> {
   const env: Record<string, string> = {};
-  const keys = ["PATH", "HOME", "USER", "SHELL", "LANG", "LC_ALL", "TMPDIR"];
+  const keys = ["PATH", "HOME", "USER", "SHELL", "LANG", "LC_ALL", "TMPDIR", "JIRA_API_TOKEN"];
   for (const key of keys) {
     if (process.env[key]) env[key] = process.env[key]!;
   }
@@ -155,6 +161,8 @@ export async function createSession(opts: CreateSessionOpts): Promise<PtySession
     name: opts.name ?? null,
     startedAt: Date.now(),
     serverReady: false,
+    claudeSession: opts.claudeSession ?? false,
+    autoFeedbackTriggered: false,
   };
 
   sessions.set(opts.sessionId, session);
@@ -190,8 +198,19 @@ export async function createSession(opts: CreateSessionOpts): Promise<PtySession
       }
     }
 
-    // Terminal sessions: schedule cleanup
+    // Terminal sessions: auto-feedback + schedule cleanup
     if (session.type === "terminal") {
+      // Auto-feedback: spawn follow-up Claude session if configured
+      if (
+        session.claudeSession &&
+        !session.autoFeedbackTriggered &&
+        !opts.sessionId.endsWith("-feedback")
+      ) {
+        session.autoFeedbackTriggered = true;
+        handleAutoFeedback(opts.sessionId, session, opts.cwd).catch(() => {
+          // Non-critical: don't break normal cleanup
+        });
+      }
       scheduleCleanup(opts.sessionId);
     }
     // Server sessions: keep around — cleaned up on next Start or Stop
@@ -290,5 +309,51 @@ function scheduleCleanup(sessionId: string): void {
   s.cleanupTimer = setTimeout(
     () => destroySession(sessionId),
     TERMINAL_ORPHAN_TIMEOUT,
+  );
+}
+
+/**
+ * Auto-feedback: spawn a follow-up Claude session with the feedback prompt.
+ * Transfers existing viewers to the new session.
+ */
+async function handleAutoFeedback(
+  sessionId: string,
+  session: PtySession,
+  cwd: string,
+): Promise<void> {
+  const { getEffectiveConfig } = await import("./auto-feedback");
+  const taskNo = session.taskNo || "";
+  const feedbackConfig = getEffectiveConfig(taskNo);
+
+  if (!feedbackConfig.enabled || !feedbackConfig.prompt) return;
+
+  const feedbackSessionId = `${sessionId}-feedback`;
+  const escapedPrompt = feedbackConfig.prompt.replace(/"/g, '\\"');
+
+  const feedbackSession = await createSession({
+    sessionId: feedbackSessionId,
+    cwd,
+    type: "terminal",
+    taskNo: session.taskNo ?? undefined,
+    name: `${session.name || "Terminal"} (Feedback)`,
+    initialCommand: `claude "${escapedPrompt}"`,
+    claudeSession: false, // Prevent recursive feedback
+  });
+
+  // Notify existing viewers and transfer them to the feedback session
+  for (const ws of session.viewers) {
+    if (ws.readyState === 1 /* WebSocket.OPEN */) {
+      ws.send(
+        JSON.stringify({
+          type: "pty:feedback-start",
+          feedbackSessionId,
+        }),
+      );
+      attachViewer(feedbackSessionId, ws);
+    }
+  }
+
+  console.log(
+    `[pty] Auto-feedback session ${feedbackSessionId} started for ${taskNo}`,
   );
 }
